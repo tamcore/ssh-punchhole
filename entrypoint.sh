@@ -11,7 +11,7 @@ IFS=' ' read -r -a LOCAL_DESTINATION <<< "${LOCAL_DESTINATION}"
 len=${#REMOTE_FORWARD[@]}
 
 for (( i=0; i<$len; i++ ))
-do 
+do
   remote=${REMOTE_FORWARD[$i]}
   local=${LOCAL_DESTINATION[$i]-${LOCAL_DESTINATION[0]}}
 
@@ -23,4 +23,3 @@ done
 _ssh+="${SSH_USER-root}@${REMOTE_HOST}"
 
 ${_ssh}
-

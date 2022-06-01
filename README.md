@@ -2,7 +2,7 @@
 
 This is my simple way of exposing my self-hosted services without having to deal with port-forwarding and exposing my home IP to the public.
 
-Technically it only requires a cheap VPS for the public endpoint and could forward the traffic directly to your service (i.e. Nextcloud). But having a local reverse proxy like Traefik is recommended. 
+Technically it only requires a cheap VPS for the public endpoint and could forward the traffic directly to your service (i.e. Nextcloud). But having a local reverse proxy like Traefik is recommended.
 
 This container will be the connecting part between the both endpoints. It'll establish a SSH session to the VPS, open (public) ports there and forward the traffic arriving at those ports to the local destination.
 
