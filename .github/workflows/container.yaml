@@ -1,4 +1,4 @@
-name: Docker Build and Publish
+name: Container Build and Publish
 
 on:
   push:
@@ -10,9 +10,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Image
-    
+  container:
+
     runs-on: ubuntu-latest
 
     permissions:
@@ -37,8 +36,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image and push 
-        uses: docker/build-push-action@v2
+      - name: Build image and push
+        uses: int128/kaniko-action@v1
         with:
           context: .
           labels: ${{ steps.meta.outputs.labels }}
