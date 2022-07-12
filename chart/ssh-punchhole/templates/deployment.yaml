@@ -1,0 +1,52 @@
+{{- if gt ( int .Values.replicaCount ) 1 }}
+{{- fail "Deploying more replicas than 1 is not supported." }}
+{{- end }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "charts.fullname" . }}
+  labels:
+  {{- include "charts.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+    {{- include "charts.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+      {{- include "charts.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1337
+        runAsGroup: 1337
+        runAsUser: 1337
+      containers:
+      - name: "main"
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "charts.fullname" . }}-config
+        volumeMounts:
+        - name: ssh-data
+          mountPath: "/ssh"
+          readOnly: true
+        {{- if .Values.resources }}
+        resources: {{- toYaml .Values.resources | nindent 10 }}
+        {{- end }}
+        {{- if .Values.postStart.command }}
+        lifecycle:
+          postStart:
+            exec:
+              command: {{ toYaml .Values.postStart.command | nindent 14 }}
+        {{- end }}
+      volumes:
+      - name: ssh-data
+        secret:
+          defaultMode: 0600
+          secretName: {{ include "charts.fullname" . }}-data

@@ -1,0 +1,44 @@
+## @section Image parameters
+## @param image.repository image repository
+## @param image.tag image tag
+## @param image.pullPolicy image pull policy
+image:
+  repository: "ghcr.io/tamcore/ssh-punchhole"
+  tag: ""
+  pullPolicy: "IfNotPresent"
+
+## @section Generic parameters
+
+## @param replicaCount Number of replicas to deploy
+replicaCount: 1
+
+## @param postStart.command If set, will run the command as a postStart handler
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/attach-handler-lifecycle-event/
+postStart:
+  command: []
+
+## @param resources.limits The resources limits for the pod
+## @param resources.requests The requested resources for the pod
+resources:
+  limits: {}
+  requests: {}
+
+## @section Configuration
+## @param configuration.SSH_PORT SSH Port to connect to
+## @param configuration.SSH_USER User to login as on the remote host
+## @param configuration.REMOTE_HOST Remote host to connect to
+## @param configuration.REMOTE_FORWARD ip:port combinations to open on the remote host
+## @param configuration.LOCAL_DESTINATION ip:port combinations to forward traffic to on the local side
+configuration:
+  SSH_PORT: "22"
+  SSH_USER: "root"
+  REMOTE_HOST: "pub.example.com"
+  REMOTE_FORWARD: "0.0.0.0:80 0.0.0.0:443"
+  LOCAL_DESTINATION: "ingress-nginx-controller.ingress-nginx.svc:80 ingress-nginx-controller.ingress-nginx.svc:443"
+
+## @section SSH Credentials
+## @param data.privateKey Passwordless OpenSSH Private Key authorized to login as `SSH_USER` on `REMOTE_HOST`
+## @param data.knownHosts Used for OpenSSH HostKeyVerification. Output of `ssh-keyscan ${REMOTE_HOST}`.
+data:
+  privateKey: ""
+  knownHosts: ""
