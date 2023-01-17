@@ -1,0 +1,47 @@
+name: Release Chart
+on:
+  push:
+    paths:
+      - chart/ssh-punchhole/Chart.yaml
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_SUFFIX: /chart
+
+jobs:
+  chart-release:
+    if: github.ref_name == 'master'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Login to registry
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' | \
+            helm registry login \
+              -u '${{ github.repository_owner }}' \
+              --password-stdin \
+              ${REGISTRY}
+
+      - name: Package Chart
+        run: |
+          echo PACKAGE=$(helm package chart/ssh-punchhole | cut -d " " -f 8) >> ${GITHUB_ENV}
+
+      - name: Push Chart
+        run: |
+          helm push \
+            ${{ env.PACKAGE }} \
+            oci://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ env.IMAGE_SUFFIX }}
