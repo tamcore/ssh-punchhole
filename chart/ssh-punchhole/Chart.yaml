@@ -4,6 +4,6 @@ description: Tiny SSH based reverse-tunnel to expose services behind a firewall
 
 type: application
 
-version: 0.0.1
+version: 0.0.2
 
 appVersion: "v2.2"

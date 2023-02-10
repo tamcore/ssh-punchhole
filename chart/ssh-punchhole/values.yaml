@@ -35,6 +35,18 @@ configuration:
   REMOTE_HOST: "pub.example.com"
   REMOTE_FORWARD: "0.0.0.0:80 0.0.0.0:443"
   LOCAL_DESTINATION: "ingress-nginx-controller.ingress-nginx.svc:80 ingress-nginx-controller.ingress-nginx.svc:443"
+  # -
+  #   SSH_PORT: "22"
+  #   SSH_USER: "root"
+  #   REMOTE_HOST: "pub.example.com"
+  #   REMOTE_FORWARD: "0.0.0.0:80"
+  #   LOCAL_DESTINATION: "ingress-nginx-controller.ingress-nginx.svc:80"
+  # -
+  #   SSH_PORT: "22"
+  #   SSH_USER: "root"
+  #   REMOTE_HOST: "pub.example.com"
+  #   REMOTE_FORWARD: "0.0.0.0:443"
+  #   LOCAL_DESTINATION: "ingress-nginx-controller.ingress-nginx.svc:443"
 
 ## @section SSH Credentials
 ## @param data.privateKey Passwordless OpenSSH Private Key authorized to login as `SSH_USER` on `REMOTE_HOST`
