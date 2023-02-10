@@ -21,14 +21,18 @@ spec:
       labels:
       {{- include "charts.selectorLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.podSecurityContext }}
       securityContext:
-        fsGroup: 1337
-        runAsGroup: 1337
-        runAsUser: 1337
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: "main"
         image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.imagePullPolicy }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         envFrom:
         - configMapRef:
             name: {{ include "charts.fullname" . }}-config
