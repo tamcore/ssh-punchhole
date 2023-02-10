@@ -16,7 +16,6 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
       {{- include "charts.selectorLabels" . | nindent 8 }}
@@ -33,9 +32,11 @@ spec:
         securityContext:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        envFrom:
-        - configMapRef:
-            name: {{ include "charts.fullname" . }}-config
+        env:
+        {{- range $k, $v := mergeOverwrite (.Values.configuration) (dict "IDENTITYFILE" "/ssh/id_rsa" "KNOWN_HOSTS" "/ssh/known_hosts") }}
+        - name: "{{ $k }}"
+          value: "{{ $v }}"
+        {{- end }}
         volumeMounts:
         - name: ssh-data
           mountPath: "/ssh"
