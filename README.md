@@ -6,7 +6,7 @@ Technically it only requires a cheap VPS for the public endpoint and could forwa
 
 This container will be the connecting part between the both endpoints. It'll establish a SSH session to the VPS, open (public) ports there and forward the traffic arriving at those ports to the local destination.
 
-If you fancy, you can have it bind directly to :80 and :443 (which would require it to connect as root, as everything bellow 1024 is restricted), but then you'll lose the ability to log the Source IP. So I'd recommend having a reverse proxy running on your VPS as well and have it configured to forward incoming (public) traffic to your local (tunnel) ports.
+If you fancy, you can have it bind directly to :80 and :443 (which would require it to connect as root, as everything bellow 1024 is restricted), but then you'll lose the ability to log the Source IP. So I'd recommend having a reverse proxy running on your VPS as well and have it configured to forward incoming (public) traffic to your local (tunnel) ports. If you want to bind to a non-loopback IP (i.e. 0.0.0.0 or your servers public IP), you have to enable the `GatewayPorts` in your server's `sshd_config`. Additionally, if the port is bellow 1024, you'll have to connect as root.
 
 ## Quickstart with haproxy on the VPS, docker-compose for your this tunneling container and Traefik as reverse Proxy
 
