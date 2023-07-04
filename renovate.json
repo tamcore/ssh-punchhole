@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
+    "config:recommended",
     ":automergePatch"
   ],
   "automergeType": "pr",
@@ -12,7 +12,9 @@
   "rebaseWhen": "behind-base-branch",
   "regexManagers": [
     {
-      "fileMatch": ["Dockerfile$"],
+      "fileMatch": [
+        "Dockerfile$"
+      ],
       "matchStrings": [
         "#\\srenovate:\\sdatasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ENV|ARG) .*?_VERSION=\"?(?<currentValue>.*?)\"?\\n"
       ]
