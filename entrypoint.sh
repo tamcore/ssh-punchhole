@@ -2,7 +2,9 @@
 
 set -x
 
-_ssh="ssh -o StrictHostKeyChecking=yes -N -n -v "
+# -N Do not execute a remote command.
+# -n Redirects stdin from /dev/null
+_ssh="ssh -o StrictHostKeyChecking=yes -N -n ${SSH_OPTS}"
 _ssh+="-p ${SSH_PORT-22} -o IdentityFile=${IDENTITYFILE-/id_rsa} -o UserKnownHostsFile=${KNOWN_HOSTS-/known_hosts} "
 
 IFS=' ' read -r -a REMOTE_FORWARD <<< "${REMOTE_FORWARD}"
