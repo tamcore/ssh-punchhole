@@ -12,10 +12,7 @@ ENV IDENTITYFILE /id_rsa
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN addgroup -g 1337 -S joe && \
-    adduser -u 1337 -S joe -G joe
-
-USER joe
+USER nobody
 
 ENTRYPOINT ["tini", "--"]
 CMD ["/entrypoint.sh"]
