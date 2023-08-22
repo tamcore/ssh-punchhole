@@ -12,6 +12,7 @@
   "rebaseWhen": "behind-base-branch",
   "regexManagers": [
     {
+      "customType": "regex",
       "fileMatch": [
         "Dockerfile$"
       ],
