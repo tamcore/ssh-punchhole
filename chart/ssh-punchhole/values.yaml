@@ -17,6 +17,12 @@ replicaCount: 1
 postStart:
   command: []
 
+## @param command Override default container command
+command: []
+
+## @param args Override default container args
+args: []
+
 ## @param resources.limits The resources limits for the pod
 ## @param resources.requests The requested resources for the pod
 resources:
@@ -56,8 +62,12 @@ data:
   knownHosts: ""
 
 podSecurityContext:
-  fsGroup: 1337
-  runAsGroup: 1337
-  runAsUser: 1337
+  fsGroup: 65534
+  runAsGroup: 65534
+  runAsUser: 65534
 
-securityContext: []
+securityContext:
+  capabilities:
+    drop:
+    - all
+  readOnlyRootFilesystem: true
