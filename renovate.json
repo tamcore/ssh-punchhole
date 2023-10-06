@@ -1,24 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    ":automergePatch"
-  ],
-  "automergeType": "pr",
-  "labels": [
-    "renovate"
-  ],
-  "separateMinorPatch": true,
-  "rebaseWhen": "behind-base-branch",
-  "regexManagers": [
-    {
-      "customType": "regex",
-      "fileMatch": [
-        "Dockerfile$"
-      ],
-      "matchStrings": [
-        "#\\srenovate:\\sdatasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ENV|ARG) .*?_VERSION=\"?(?<currentValue>.*?)\"?\\n"
-      ]
-    }
+    "github>tamcore/renovate"
   ]
 }
