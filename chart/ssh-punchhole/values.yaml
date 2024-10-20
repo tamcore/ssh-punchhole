@@ -60,6 +60,7 @@ configuration:
 data:
   privateKey: ""
   knownHosts: ""
+  existingSecret: ""
 
 podSecurityContext:
   fsGroup: 65534
