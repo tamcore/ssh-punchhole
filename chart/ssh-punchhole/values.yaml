@@ -57,9 +57,11 @@ configuration:
 ## @section SSH Credentials
 ## @param data.privateKey Passwordless OpenSSH Private Key authorized to login as `SSH_USER` on `REMOTE_HOST`
 ## @param data.knownHosts Used for OpenSSH HostKeyVerification. Output of `ssh-keyscan ${REMOTE_HOST}`.
+## @param data.existingSecret The name of a secret containing keys `id_rsa` and `known_hosts`.
 data:
   privateKey: ""
   knownHosts: ""
+  existingSecret: ""
 
 podSecurityContext:
   fsGroup: 65534

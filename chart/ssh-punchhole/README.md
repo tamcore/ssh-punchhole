@@ -58,10 +58,11 @@ The command removes all the Kubernetes components associated with the chart and 
 
 ### SSH Credentials
 
-| Name              | Description                                                                         | Value |
-| ----------------- | ----------------------------------------------------------------------------------- | ----- |
-| `data.privateKey` | Passwordless OpenSSH Private Key authorized to login as `SSH_USER` on `REMOTE_HOST` | `""`  |
-| `data.knownHosts` | Used for OpenSSH HostKeyVerification. Output of `ssh-keyscan ${REMOTE_HOST}`.       | `""`  |
+| Name                  | Description                                                                         | Value |
+| --------------------- | ----------------------------------------------------------------------------------- | ----- |
+| `data.privateKey`     | Passwordless OpenSSH Private Key authorized to login as `SSH_USER` on `REMOTE_HOST` | `""`  |
+| `data.knownHosts`     | Used for OpenSSH HostKeyVerification. Output of `ssh-keyscan ${REMOTE_HOST}`.       | `""`  |
+| `data.existingSecret` | Name of secret containing keys `id_rsa` and `known_hosts`.                          | `""`  |
 
 
 ## License

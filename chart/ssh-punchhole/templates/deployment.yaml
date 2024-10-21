@@ -80,5 +80,9 @@ spec:
       - name: ssh-data
         secret:
           defaultMode: 0600
+          {{- if not $.Values.data.existingSecret }}
           secretName: {{ include "charts.fullname" $ }}-data
+          {{- else }}
+          secretName: {{ $.Values.data.existingSecret }}
+          {{- end }}
 {{- end }}
