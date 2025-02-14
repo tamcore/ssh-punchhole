@@ -1,4 +1,4 @@
-FROM alpine:3.20.3
+FROM alpine:3.20.6
 
 RUN apk add --update --no-cache tini bash openssh-client
 
