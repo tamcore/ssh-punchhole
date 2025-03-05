@@ -3,7 +3,7 @@ repos:
   rev: v5.0.0
   hooks:
   - id: check-yaml
-    exclude: ^chart/.*/templates/.*.yaml
+    exclude: ^chart/templates/.*.yaml
   - id: end-of-file-fixer
   - id: trailing-whitespace
   - id: mixed-line-ending

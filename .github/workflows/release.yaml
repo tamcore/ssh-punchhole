@@ -1,4 +1,4 @@
-name: Container Build and Publish
+name: Publish Release
 
 on:
   push:
@@ -54,3 +54,48 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: false
+          provenance: false
+
+  chart:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login to registry
+        run: |
+          echo '${{ secrets.GITHUB_TOKEN }}' | \
+            helm registry login \
+              -u '${{ github.repository_owner }}' \
+              --password-stdin \
+              ${REGISTRY}
+
+      - name: Package Chart
+        run: |
+          echo PACKAGE=$( helm package chart/ --app-version ${{ github.ref_name }} --version ${{ github.ref_name }} | cut -d " " -f 8 ) >> ${GITHUB_ENV}
+
+      - name: Push Chart
+        run: |
+          helm push \
+            ${{ env.PACKAGE }} \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} --repo ${{ github.repository }} --generate-notes
