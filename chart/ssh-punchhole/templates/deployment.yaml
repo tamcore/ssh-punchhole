@@ -30,13 +30,13 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-    {{- include "charts.selectorLabels" $ | nindent 6 }}
+    {{- include "charts.selectorLabels" (mergeOverwrite (deepCopy $) (dict "deploymentName" $deploymentName)) | nindent 6 }}
   template:
     metadata:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") $ | sha256sum }}
       labels:
-      {{- include "charts.selectorLabels" $ | nindent 8 }}
+      {{- include "charts.selectorLabels" (mergeOverwrite (deepCopy $) (dict "deploymentName" $deploymentName)) | nindent 8 }}
     spec:
       {{- with $.Values.podSecurityContext }}
       securityContext:
