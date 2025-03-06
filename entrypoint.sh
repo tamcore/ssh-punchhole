@@ -4,7 +4,11 @@ set -x
 
 # -N Do not execute a remote command.
 # -n Redirects stdin from /dev/null
-_ssh="ssh -o StrictHostKeyChecking=yes -N -n ${SSH_OPTS}"
+_ssh="ssh -o StrictHostKeyChecking=yes  -N -n ${SSH_OPTS}"
+
+# ExitOnForwardFailure prevents SSH from getting stuck in case of a "Warning: remote port forwarding failed for listen port"
+[[ "${SSH_OPTS}" != *ExitOnForwardFailure* ]] && _ssh+="-o ExitOnForwardFailure=yes "
+
 _ssh+="-p ${SSH_PORT-22} -o IdentityFile=${IDENTITYFILE-/id_rsa} -o UserKnownHostsFile=${KNOWN_HOSTS-/known_hosts} "
 
 IFS=' ' read -r -a REMOTE_FORWARD <<< "${REMOTE_FORWARD}"
