@@ -73,3 +73,5 @@ securityContext:
     drop:
     - all
   readOnlyRootFilesystem: true
+
+extraPodSpec: {}

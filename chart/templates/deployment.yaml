@@ -12,8 +12,8 @@
 {{- $configuration = .Values.configuration }}
 {{- end }}
 
-{{- range $k, $v := $configuration }}
-{{- $deploymentName := printf "%s-%v" (include "charts.fullname" $) $k }}
+{{- range $i, $config := $configuration }}
+{{- $deploymentName := printf "%s-%v" (include "charts.fullname" $) $i }}
 {{- if $stripSuffix }}
 {{- $deploymentName = trimSuffix "-0" $deploymentName }}
 {{- end }}
@@ -38,51 +38,6 @@ spec:
       labels:
       {{- include "charts.selectorLabels" (mergeOverwrite (deepCopy $) (dict "deploymentName" $deploymentName)) | nindent 8 }}
     spec:
-      {{- with $.Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      containers:
-      - name: {{ include "charts.fullname" $ }}
-        image: {{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}
-        imagePullPolicy: {{ $.Values.image.pullPolicy }}
-        {{- with $.Values.command }}
-        command:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- with $.Values.args }}
-        args:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- with $.Values.securityContext }}
-        securityContext:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        env:
-        {{- range $k, $v := mergeOverwrite ($v) (dict "IDENTITYFILE" "/ssh/id_rsa" "KNOWN_HOSTS" "/ssh/known_hosts") }}
-        - name: "{{ $k }}"
-          value: "{{ $v }}"
-        {{- end }}
-        volumeMounts:
-        - name: ssh-data
-          mountPath: "/ssh"
-          readOnly: true
-        {{- if $.Values.resources }}
-        resources: {{- toYaml $.Values.resources | nindent 10 }}
-        {{- end }}
-        {{- if $.Values.postStart.command }}
-        lifecycle:
-          postStart:
-            exec:
-              command: {{ toYaml $.Values.postStart.command | nindent 14 }}
-        {{- end }}
-      volumes:
-      - name: ssh-data
-        secret:
-          defaultMode: 0600
-          {{- if not $.Values.data.existingSecret }}
-          secretName: {{ include "charts.fullname" $ }}-data
-          {{- else }}
-          secretName: {{ $.Values.data.existingSecret }}
-          {{- end }}
+      {{- $podSpec := include "ssh-punchhole.podSpec" (dict "Release" $.Release "Chart" $.Chart "Values" $.Values "config" $config) | fromYaml }}
+      {{- mergeOverwrite (dict) $podSpec $.Values.extraPodSpec | toYaml | nindent 6 }}
 {{- end }}
