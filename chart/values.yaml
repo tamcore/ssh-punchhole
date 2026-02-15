@@ -17,6 +17,104 @@ replicaCount: 1
 postStart:
   command: []
 
+## @section Health Check Configuration
+## @param healthcheck.enabled Enable health checks (default: true)
+## @param healthcheck.livenessProbe.initialDelaySeconds Initial delay for liveness probe
+## @param healthcheck.livenessProbe.periodSeconds Period for liveness probe
+## @param healthcheck.livenessProbe.timeoutSeconds Timeout for liveness probe
+## @param healthcheck.livenessProbe.failureThreshold Failure threshold for liveness probe
+## @param healthcheck.readinessProbe.initialDelaySeconds Initial delay for readiness probe
+## @param healthcheck.readinessProbe.periodSeconds Period for readiness probe
+## @param healthcheck.readinessProbe.timeoutSeconds Timeout for readiness probe
+## @param healthcheck.readinessProbe.failureThreshold Failure threshold for readiness probe
+healthcheck:
+  enabled: true
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 2
+
+## @section Lifecycle Configuration
+## @param lifecycle.preStop.enabled Enable preStop hook for graceful shutdown
+## @param lifecycle.preStop.sleepSeconds Sleep duration in seconds before termination
+lifecycle:
+  preStop:
+    enabled: true
+    sleepSeconds: 5
+
+## @section Metrics Configuration
+## @param metrics.enabled Enable metrics collection (default: false, opt-in)
+## @param metrics.collectionInterval Metrics collection interval in seconds
+## @param metrics.resources.limits Metrics collector resource limits
+## @param metrics.resources.requests Metrics collector resource requests
+## @param metrics.serviceMonitor.enabled Enable ServiceMonitor for Prometheus Operator
+## @param metrics.serviceMonitor.interval Scrape interval
+## @param metrics.serviceMonitor.scrapeTimeout Scrape timeout
+metrics:
+  enabled: false
+  collectionInterval: 30
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+
+  ## Prometheus alerts configuration
+  ## @param metrics.prometheusRule.enabled Create PrometheusRule resource for alerts
+  ## @param metrics.prometheusRule.interval Evaluation interval for alert rules
+  ## @param metrics.prometheusRule.additionalLabels Additional labels for PrometheusRule resource
+  ## @param metrics.prometheusRule.rules Alert rules (default rules included, can be customized or extended)
+  prometheusRule:
+    enabled: false
+    interval: 30s
+    additionalLabels: {}
+    # Example: Add labels for prometheus-operator to discover this rule
+    # prometheus: kube-prometheus
+    # role: alert-rules
+
+    ## Alert rules in Prometheus format
+    ## Set rules: [] to disable all default alerts
+    ## Add custom rules directly to this array
+    rules:
+    - alert: SSHPunchholeDown
+      expr: ssh_punchhole_up == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "SSH punchhole {{ $labels.instance }} is down"
+        description: "SSH punchhole to {{ $labels.remote_host }} has been down for more than 2 minutes"
+
+    - alert: SSHPunchholeHighRetransmits
+      expr: rate(ssh_punchhole_retransmits_total[5m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "SSH punchhole {{ $labels.instance }} has high TCP retransmits"
+        description: "SSH punchhole to {{ $labels.remote_host }} is experiencing {{ printf \"%.2f\" $value }} retransmits/sec"
+
+    - alert: SSHPunchholeFrequentRestarts
+      expr: rate(kube_pod_container_status_restarts_total[15m]) > 0.1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "SSH punchhole {{ $labels.pod }} is restarting frequently"
+        description: "SSH punchhole pod {{ $labels.pod }} has restarted frequently in the last 15 minutes"
+
 ## @param command Override default container command
 command: []
 
@@ -26,8 +124,12 @@ args: []
 ## @param resources.limits The resources limits for the pod
 ## @param resources.requests The requested resources for the pod
 resources:
-  limits: {}
-  requests: {}
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
 
 ## @section Configuration
 ## @param configuration.SSH_PORT SSH Port to connect to
@@ -35,12 +137,30 @@ resources:
 ## @param configuration.REMOTE_HOST Remote host to connect to
 ## @param configuration.REMOTE_FORWARD ip:port combinations to open on the remote host
 ## @param configuration.LOCAL_DESTINATION ip:port combinations to forward traffic to on the local side
+## @param configuration.SSH_SERVER_ALIVE_INTERVAL Seconds between keepalive messages (default: 10)
+## @param configuration.SSH_SERVER_ALIVE_COUNT_MAX Max failed keepalives before disconnect (default: 3)
+## @param configuration.SSH_CONNECT_TIMEOUT Initial connection timeout in seconds (default: 30)
+## @param configuration.SSH_MAX_RETRIES Maximum connection retry attempts (default: 10)
+## @param configuration.SSH_INITIAL_BACKOFF Initial retry backoff in seconds (default: 5)
+## @param configuration.SSH_MAX_BACKOFF Maximum retry backoff in seconds (default: 300)
+## @param configuration.SSH_CIPHER SSH cipher to use (default: chacha20-poly1305@openssh.com)
+## @param configuration.SSH_COMPRESSION Enable SSH compression (default: no)
+## @param configuration.SSH_IPQOS IP QoS value for low latency (default: lowdelay)
 configuration:
   SSH_PORT: "22"
   SSH_USER: "root"
   REMOTE_HOST: "pub.example.com"
   REMOTE_FORWARD: "0.0.0.0:80 0.0.0.0:443"
   LOCAL_DESTINATION: "ingress-nginx-controller.ingress-nginx.svc:80 ingress-nginx-controller.ingress-nginx.svc:443"
+  SSH_SERVER_ALIVE_INTERVAL: "10"
+  SSH_SERVER_ALIVE_COUNT_MAX: "3"
+  SSH_CONNECT_TIMEOUT: "30"
+  SSH_MAX_RETRIES: "10"
+  SSH_INITIAL_BACKOFF: "5"
+  SSH_MAX_BACKOFF: "300"
+  # SSH_CIPHER: "chacha20-poly1305@openssh.com"  # Optional: Let SSH negotiate by default
+  # SSH_COMPRESSION: "no"  # Optional: disabled by default
+  # SSH_IPQOS: "lowdelay"  # Optional: low latency by default
   # -
   #   SSH_PORT: "22"
   #   SSH_USER: "root"

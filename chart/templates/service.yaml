@@ -1,0 +1,19 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "charts.fullname" . }}-metrics
+  labels:
+    {{- include "charts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    {{- include "charts.selectorLabels" . | nindent 4 }}
+{{- end }}

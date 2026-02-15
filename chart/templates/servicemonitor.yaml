@@ -1,0 +1,19 @@
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "charts.fullname" . }}
+  labels:
+    {{- include "charts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  selector:
+    matchLabels:
+      {{- include "charts.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: metrics
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.metrics.serviceMonitor.interval }}
+    scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+    path: /ssh_punchhole.prom
+{{- end }}

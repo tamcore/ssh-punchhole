@@ -1,6 +1,6 @@
 FROM alpine:3.23.3
 
-RUN apk add --update --no-cache tini bash openssh-client
+RUN apk add --update --no-cache bash openssh-client iproute2-ss busybox-extras
 
 ENV SSH_PORT 22
 ENV SSH_USER root
@@ -10,9 +10,12 @@ ENV LOCAL_DESTINATION ""
 ENV IDENTITYFILE /id_rsa
 
 COPY ./entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY ./healthcheck.sh /healthcheck.sh
+COPY ./metrics-collector.sh /metrics-collector.sh
+RUN chmod +x /entrypoint.sh /healthcheck.sh /metrics-collector.sh
+
+EXPOSE 9090
 
 USER nobody
 
-ENTRYPOINT ["tini", "--"]
-CMD ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

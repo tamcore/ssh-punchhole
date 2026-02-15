@@ -100,3 +100,202 @@ backend backend-https
     mode tcp
     server localhost 127.0.0.1:9443 send-proxy-v2
 ````
+
+## Features (v2.5.0+)
+
+### Connection Resilience
+
+Automatic reconnection with exponential backoff when SSH connections fail:
+
+- **Keepalive**: Detects dead connections within 30 seconds (configurable)
+- **Retry Logic**: Up to 10 reconnection attempts with exponential backoff
+- **Health Checks**: Kubernetes liveness/readiness probes for automatic pod restart
+- **Graceful Shutdown**: Clean SSH termination on pod deletion
+
+**Configuration:**
+```yaml
+configuration:
+  SSH_SERVER_ALIVE_INTERVAL: "10"    # Send keepalive every 10s
+  SSH_SERVER_ALIVE_COUNT_MAX: "3"    # Fail after 3 missed keepalives
+  SSH_CONNECT_TIMEOUT: "30"          # Connection timeout (seconds)
+  SSH_MAX_RETRIES: "10"              # Max reconnection attempts
+  SSH_INITIAL_BACKOFF: "5"           # Initial retry delay (seconds)
+  SSH_MAX_BACKOFF: "300"             # Maximum retry delay (seconds)
+```
+
+### Performance Optimization
+
+Optimized for file transfers and low-latency connections:
+
+- **Fast Cipher**: ChaCha20-Poly1305 (CPU-friendly, fast)
+- **IP QoS**: Low latency network prioritization
+- **Disabled Auth Methods**: Faster connection establishment
+
+**Configuration:**
+```yaml
+configuration:
+  SSH_CIPHER: "chacha20-poly1305@openssh.com"  # Options: chacha20-poly1305@openssh.com, aes128-gcm@openssh.com, aes256-gcm@openssh.com
+  SSH_COMPRESSION: "no"                        # Enable for text traffic, disable for binary
+  SSH_IPQOS: "lowdelay"                        # Options: lowdelay, throughput, reliability
+```
+
+**Performance Tips:**
+- Use `chacha20-poly1305@openssh.com` for best CPU efficiency (default)
+- Use `aes128-gcm@openssh.com` if your CPU has AES-NI hardware acceleration
+- Enable compression (`SSH_COMPRESSION: "yes"`) for text-heavy traffic only
+- Use `SSH_IPQOS: "throughput"` for bulk data transfers
+
+### Health Checks
+
+Kubernetes probes automatically detect and restart failed tunnels:
+
+**Configuration:**
+```yaml
+healthcheck:
+  enabled: true  # Enabled by default
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 2
+```
+
+**How it works:**
+1. Health check script verifies SSH process is running
+2. Validates SSH control socket exists
+3. Tests connection responsiveness
+4. Kubernetes restarts pod if checks fail
+
+### Observability & Metrics
+
+Optional Prometheus-compatible metrics for monitoring tunnel health. The metrics collector is included in the main container and runs as a sidecar when enabled.
+
+**Metrics Exposed:**
+- `ssh_punchhole_up` - Tunnel status (1=up, 0=down)
+- `ssh_punchhole_connection_duration_seconds` - Current connection uptime
+- `ssh_punchhole_bytes_sent_total` - Total bytes sent
+- `ssh_punchhole_bytes_received_total` - Total bytes received
+- `ssh_punchhole_retransmits_total` - TCP retransmissions (connection quality)
+- `ssh_punchhole_container_uptime_seconds` - Container uptime
+
+**Enable Metrics (Opt-in):**
+```yaml
+metrics:
+  enabled: true
+  collectionInterval: 30  # Scrape interval in seconds
+
+  # Optional: Enable ServiceMonitor for Prometheus Operator
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+```
+
+**How it works:**
+- Metrics collector runs as sidecar with `command: ["/metrics-collector.sh"]`
+- Exposed on port 9090 at `/ssh_punchhole.prom`
+- Configure alerts via `metrics.prometheusRule` in values.yaml
+
+## Kubernetes / Helm Usage
+
+Install via Helm:
+
+```bash
+# Add repository
+helm repo add tamcore https://ghcr.io/tamcore/charts
+
+# Install basic tunnel
+helm install my-tunnel tamcore/ssh-punchhole \
+  --set configuration.REMOTE_HOST=your-vps.example.com \
+  --set configuration.REMOTE_FORWARD="0.0.0.0:80 0.0.0.0:443" \
+  --set configuration.LOCAL_DESTINATION="nginx:80 nginx:443" \
+  --set data.privateKey="$(cat id_rsa)" \
+  --set data.knownHosts="$(cat known_hosts)"
+
+# Install with metrics enabled
+helm install my-tunnel tamcore/ssh-punchhole \
+  --set configuration.REMOTE_HOST=your-vps.example.com \
+  --set metrics.enabled=true \
+  --set metrics.serviceMonitor.enabled=true \
+  --set-file data.privateKey=./id_rsa \
+  --set-file data.knownHosts=./known_hosts
+```
+
+**Minimal values.yaml:**
+
+```yaml
+configuration:
+  REMOTE_HOST: "vps.example.com"
+  REMOTE_FORWARD: "0.0.0.0:80 0.0.0.0:443"
+  LOCAL_DESTINATION: "ingress-nginx:80 ingress-nginx:443"
+
+data:
+  privateKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    ...
+  knownHosts: |
+    vps.example.com ssh-rsa AAAAB3...
+
+# Optional: Enable metrics and alerts
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+```
+
+See chart/values.yaml for all available options.
+
+## Troubleshooting
+
+- **Connection fails**: Check SSH key authorization, known_hosts, and pod logs
+- **Frequent disconnects**: Check `ssh_punchhole_retransmits_total` metric, review VPS firewall
+- **Poor performance**: Try `SSH_CIPHER: "aes128-gcm@openssh.com"` or `SSH_IPQOS: "throughput"`
+- **Health checks fail**: Increase `healthcheck.livenessProbe.initialDelaySeconds`
+- **No metrics**: Verify Prometheus Operator installed, check ServiceMonitor labels
+
+## Migration from v1.x
+
+v2.5.0 is backwards compatible. New features are opt-in (except health checks, enabled by default).
+
+## Development
+
+### Running Tests
+
+```bash
+# Run BATS tests
+bats test_entrypoint.bats
+
+# Build Docker images
+docker build -t ssh-punchhole:test .
+docker build -t ssh-punchhole-metrics:test -f Dockerfile.metrics .
+```
+
+### Building Locally
+
+```bash
+# Build image
+docker build -t ghcr.io/tamcore/ssh-punchhole:latest .
+
+# Run SSH tunnel
+docker run --rm -it \
+  -e REMOTE_HOST=vps.example.com \
+  -e REMOTE_FORWARD="127.0.0.1:8080" \
+  -e LOCAL_DESTINATION="nginx:80" \
+  -v $(pwd)/id_rsa:/id_rsa:ro \
+  -v $(pwd)/known_hosts:/known_hosts:ro \
+  ghcr.io/tamcore/ssh-punchhole:latest
+
+# Run metrics collector (same image, different command)
+docker run --rm -it \
+  -e REMOTE_HOST=vps.example.com \
+  -e SSH_PORT=22 \
+  -p 9090:9090 \
+  ghcr.io/tamcore/ssh-punchhole:latest \
+  /metrics-collector.sh
+```
