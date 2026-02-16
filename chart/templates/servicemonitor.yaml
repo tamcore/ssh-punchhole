@@ -9,7 +9,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "charts.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: {{ include "charts.name" . }}
       app.kubernetes.io/component: metrics
   endpoints:
   - port: metrics

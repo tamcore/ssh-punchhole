@@ -15,5 +15,5 @@ spec:
     protocol: TCP
     name: metrics
   selector:
-    {{- include "charts.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "charts.name" . }}
 {{- end }}
