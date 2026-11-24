@@ -470,3 +470,11 @@ fake_haproxy() {
   run ./entrypoint.sh
   [[ $(cat "${TEST_DIR}/ssh_args") =~ ^"ssh -o StrictHostKeyChecking=yes -o ControlPersist=no -o controlpersist=10m " ]]
 }
+
+@test "PROXY_PROTOCOL gives ssh a stdin that stays open" {
+  export PROXY_PROTOCOL="true"
+  ssh() { [[ -p /dev/stdin ]] && echo "fifo" > "${TEST_DIR}/stdin_type"; }
+  export -f ssh
+  run ./entrypoint.sh < /dev/null
+  [ "$(cat "${TEST_DIR}/stdin_type")" = "fifo" ]
+}

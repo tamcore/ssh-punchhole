@@ -237,7 +237,7 @@ while true; do
   set -e
 
   if [[ -n "${remote_cmd}" ]] && [[ $exit_code -eq ${HAPROXY_MISSING_EXIT_CODE} ]]; then
-    die "haproxy not found or not executable on ${REMOTE_HOST}. Install it there (do not enable the system service)."
+    die "haproxy not found or not executable on ${REMOTE_HOST} (remote exit code 127). Install haproxy there (do not enable the system service), and check that the login shell of ${SSH_USER-root} runs commands."
   fi
 
   # PROXY_PROTOCOL runs ssh in the foreground with ControlPersist=no, so its exit already means the tunnel ended
