@@ -31,9 +31,9 @@ while true; do
   current_time=$(date +%s)
 
   # Check if SSH process is running
-  if ps | grep -v grep | grep -w ssh > /dev/null 2>&1; then
+  # By name: the PROXY_PROTOCOL remote command in the ssh argv contains "grep"
+  if ssh_pid=$(pgrep -o -x ssh); then
     tunnel_up=1
-    ssh_pid=$(ps | grep -v grep | grep -w ssh | awk '{print $1}' | sed -n 1p)
     ssh_start_time=$(stat -c %Y /proc/$ssh_pid 2>/dev/null || echo $current_time)
     connection_duration=$((current_time - ssh_start_time))
 

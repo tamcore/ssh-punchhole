@@ -2,7 +2,8 @@
 set -e
 
 # Check SSH process running
-if ! ps | grep -v grep | grep -w ssh > /dev/null; then
+# By name: the PROXY_PROTOCOL remote command in the ssh argv contains "grep"
+if ! pgrep -x ssh > /dev/null; then
   echo "FAIL: SSH process not running" >&2
   exit 1
 fi
