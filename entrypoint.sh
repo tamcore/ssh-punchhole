@@ -29,9 +29,9 @@ MAX_PORT=65535
 STDIN_FIFO="/tmp/ssh-punchhole-stdin"
 HAPROXY_MISSING_EXIT_CODE=127
 HAPROXY_METRICS_PORT="${HAPROXY_METRICS_PORT:-9101}"
-# Per-pod name: several deployments may share one remote host
+# Per-pod name: several deployments may share one remote host. Short prefix: a 64-char hostname plus haproxy's ".<pid>.tmp" stays under the 108-byte sun_path limit
 _host="${HOSTNAME:-$(hostname)}"
-HAPROXY_METRICS_SOCKET="/tmp/ssh-punchhole-metrics-${_host//[^A-Za-z0-9.-]/_}.sock"
+HAPROXY_METRICS_SOCKET="/tmp/sph-metrics-${_host//[^A-Za-z0-9.-]/_}.sock"
 
 die() {
   echo "ERROR: $*" >&2

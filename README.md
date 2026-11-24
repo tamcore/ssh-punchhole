@@ -201,7 +201,7 @@ metrics:
 - Metrics collector runs as sidecar with `command: ["/metrics-collector.sh"]`
 - Exposed on port 9090 at `/ssh_punchhole.prom`
 - Configure alerts via `metrics.prometheusRule` in values.yaml
-- With `PROXY_PROTOCOL=true`, the remote haproxy serves its metrics on a unix socket (`/tmp/ssh-punchhole-metrics-<pod name>.sock`, mode 600). The SSH session forwards it to `127.0.0.1:9101` in the pod. The collector fetches it on each interval and appends it to the same file, so the haproxy metrics are up to `collectionInterval` old
+- With `PROXY_PROTOCOL=true`, the remote haproxy serves its metrics on a unix socket (`/tmp/sph-metrics-<pod name>.sock`, mode 600). The SSH session forwards it to `127.0.0.1:<HAPROXY_METRICS_PORT>` (default `9101`) in the pod. The collector fetches it on each interval and appends it to the same file, so the haproxy metrics are up to `collectionInterval` old
 
 ### PROXY Protocol (v2.6.0+)
 
@@ -211,7 +211,7 @@ Opt-in mode that keeps the client source IP. The container starts a temporary ha
 |----------|--------|---------|-------------|
 | `PROXY_PROTOCOL` | `true`, `false` | `false` | Enable PROXY protocol mode for all forwards of this tunnel |
 | `PROXY_PROTOCOL_VERSION` | `1`, `2` | `2` | `1` uses haproxy `send-proxy`, `2` uses `send-proxy-v2` |
-| `HAPROXY_METRICS_PORT` | port | `9101` | Local port in the pod for the haproxy metrics forward (v2.7.0+). Must be free in the pod; a port in use stops the tunnel (`ExitOnForwardFailure`) |
+| `HAPROXY_METRICS_PORT` | port | `9101` | Local port in the pod for the haproxy metrics forward (v2.7.0+). Must be free in the pod; with the default `ExitOnForwardFailure=yes`, a port in use stops the tunnel |
 
 For each `REMOTE_FORWARD` entry `<addr>:<port>`:
 

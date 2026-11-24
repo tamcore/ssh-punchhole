@@ -59,3 +59,13 @@ setup() {
 teardown() {
   stop_fake_ssh
 }
+
+@test "collector removes staging files left by a killed collector" {
+  mkdir -p "${METRICS_DIR}"
+  touch "${METRICS_DIR}/ssh_punchhole.prom.123" "${METRICS_DIR}/ssh_punchhole.prom.123.haproxy"
+  run bash ./metrics-collector.sh
+  [ "$status" -eq 99 ]
+  [ ! -e "${METRICS_DIR}/ssh_punchhole.prom.123" ]
+  [ ! -e "${METRICS_DIR}/ssh_punchhole.prom.123.haproxy" ]
+  [ -e "${METRICS_DIR}/ssh_punchhole.prom" ]
+}

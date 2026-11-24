@@ -13,6 +13,8 @@ HAPROXY_METRICS_URL="http://127.0.0.1:${HAPROXY_METRICS_PORT:-9101}/metrics"
 HAPROXY_FETCH_TIMEOUT=5
 
 mkdir -p "$METRICS_DIR"
+# Staging files of a collector killed mid-write
+rm -f "${METRICS_FILE}".*
 container_start_time=$(date +%s)
 
 # Start httpd in background to expose metrics

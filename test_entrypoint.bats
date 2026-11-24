@@ -390,7 +390,7 @@ fake_haproxy() {
   fake_haproxy "exit 3"
   mkfifo "${TEST_DIR}/stdin"
   exec 4<>"${TEST_DIR}/stdin"
-  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" <&4
+  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" < "${TEST_DIR}/stdin" 4>&-
   exec 4>&-
   [ "$status" -eq 3 ]
 }
@@ -485,7 +485,7 @@ fake_haproxy() {
   export REMOTE_FORWARD="0.0.0.0:443"
   capture_remote_cmd
   run ./entrypoint.sh
-  grep -q -- "-L 127.0.0.1:9101:/tmp/ssh-punchhole-metrics-pod-a.sock " "${TEST_DIR}/ssh_args"
+  grep -q -- "-L 127.0.0.1:9101:/tmp/sph-metrics-pod-a.sock " "${TEST_DIR}/ssh_args"
 }
 
 @test "PROXY_PROTOCOL metrics socket name only uses safe characters" {
@@ -493,7 +493,7 @@ fake_haproxy() {
   export HOSTNAME='pod/a b;$x'
   capture_remote_cmd
   run ./entrypoint.sh
-  grep -q -- "-L 127.0.0.1:9101:/tmp/ssh-punchhole-metrics-pod_a_b__x.sock " "${TEST_DIR}/ssh_args"
+  grep -q -- "-L 127.0.0.1:9101:/tmp/sph-metrics-pod_a_b__x.sock " "${TEST_DIR}/ssh_args"
 }
 
 @test "PROXY_PROTOCOL disabled has no metrics forward" {
@@ -505,14 +505,14 @@ fake_haproxy() {
 @test "Remote command removes metrics socket after haproxy exits" {
   export PROXY_PROTOCOL="true"
   export HOSTNAME="bats-$$-${RANDOM}"
-  sock="/tmp/ssh-punchhole-metrics-${HOSTNAME}.sock"
+  sock="/tmp/sph-metrics-${HOSTNAME}.sock"
   capture_remote_cmd
   run ./entrypoint.sh
   fake_haproxy "exit 3"
   touch "$sock"
   mkfifo "${TEST_DIR}/stdin"
   exec 4<>"${TEST_DIR}/stdin"
-  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" <&4
+  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" < "${TEST_DIR}/stdin" 4>&-
   exec 4>&-
   [ "$status" -eq 3 ]
   [ ! -e "$sock" ]
@@ -521,7 +521,7 @@ fake_haproxy() {
 run_remote_cmd_with_open_stdin() {
   mkfifo "${TEST_DIR}/stdin"
   exec 4<>"${TEST_DIR}/stdin"
-  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" <&4
+  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" < "${TEST_DIR}/stdin" 4>&-
   exec 4>&-
 }
 
@@ -539,7 +539,7 @@ run_remote_cmd_with_open_stdin() {
   [ "$(grep -c "fe_metrics" "${TEST_DIR}/haproxy.cfg")" -eq 0 ]
   grep -q "frontend fe_metrics" "${TEST_DIR}/metrics.cfg"
   grep -q "  mode http" "${TEST_DIR}/metrics.cfg"
-  grep -q "bind unix@/tmp/ssh-punchhole-metrics-pod-a.sock mode 600" "${TEST_DIR}/metrics.cfg"
+  grep -q "bind unix@/tmp/sph-metrics-pod-a.sock mode 600" "${TEST_DIR}/metrics.cfg"
   grep -q "http-request use-service prometheus-exporter" "${TEST_DIR}/metrics.cfg"
 }
 
@@ -553,4 +553,15 @@ run_remote_cmd_with_open_stdin() {
   [ "$status" -eq 0 ]
   grep -q -- "-f /dev/stdin -f /dev/null" "${TEST_DIR}/haproxy.args"
   [ ! -s "${TEST_DIR}/metrics.cfg" ]
+}
+
+@test "PROXY_PROTOCOL metrics socket path fits sun_path with a 64-char hostname" {
+  export PROXY_PROTOCOL="true"
+  export HOSTNAME="$(printf 'a%.0s' {1..64})"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  sock=$(grep -o -- '-L 127.0.0.1:9101:[^ ]*' "${TEST_DIR}/ssh_args")
+  sock=${sock#-L 127.0.0.1:9101:}
+  # haproxy binds "<path>.<pid>.tmp" first; pid up to 7 digits; 108 bytes include NUL
+  (( ${#sock} + 12 < 108 ))
 }
