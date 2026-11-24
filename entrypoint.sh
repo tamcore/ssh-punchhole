@@ -39,10 +39,6 @@ case "${PROXY_PROTOCOL}" in
   *) die "PROXY_PROTOCOL must be 'true' or 'false', got '${PROXY_PROTOCOL}'" ;;
 esac
 
-if [[ "${PROXY_PROTOCOL}" == "true" && "${SSH_OPTS}" == *ControlPersist* && "${SSH_OPTS}" != *ControlPersist=no* ]]; then
-  die "PROXY_PROTOCOL requires ControlPersist=no; remove ControlPersist from SSH_OPTS"
-fi
-
 case "${PROXY_PROTOCOL_VERSION}" in
   1) SEND_PROXY="send-proxy" ;;
   2) SEND_PROXY="send-proxy-v2" ;;
@@ -90,7 +86,8 @@ EOF
 }
 
 if [[ "${PROXY_PROTOCOL}" == "true" ]]; then
-  _ssh="ssh -o StrictHostKeyChecking=yes ${SSH_OPTS} "
+  # ssh uses the first value of an option: the master must exit with the haproxy session, so its forwards are released
+  _ssh="ssh -o StrictHostKeyChecking=yes -o ControlPersist=no ${SSH_OPTS} "
 else
   # -N Do not execute a remote command.
   # -n Redirects stdin from /dev/null
@@ -109,10 +106,7 @@ fi
 # Control socket for health checks
 [[ "${SSH_OPTS}" != *ControlMaster* ]] && _ssh+="-o ControlMaster=auto "
 [[ "${SSH_OPTS}" != *ControlPath* ]] && _ssh+="-o ControlPath=/tmp/ssh-punchhole-%r@%h:%p "
-# PROXY_PROTOCOL: the master must exit with the haproxy session, so its forwards are released
-if [[ "${SSH_OPTS}" != *ControlPersist* ]]; then
-  [[ "${PROXY_PROTOCOL}" == "true" ]] && _ssh+="-o ControlPersist=no " || _ssh+="-o ControlPersist=10m "
-fi
+[[ "${PROXY_PROTOCOL}" != "true" && "${SSH_OPTS}" != *ControlPersist* ]] && _ssh+="-o ControlPersist=10m "
 
 # Performance options (only if explicitly set, not by default)
 if [[ "${SSH_OPTS}" != *Ciphers* ]] && [[ -n "${SSH_CIPHER}" ]]; then

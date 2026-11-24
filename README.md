@@ -217,14 +217,14 @@ For each `REMOTE_FORWARD` entry `<addr>:<port>`:
 
 The local destination must accept the PROXY protocol (for example nginx `listen ... proxy_protocol`, Traefik `proxyProtocol.trustedIPs`).
 
-haproxy runs as the remote command of the SSH session and stops when the session ends. When the session stays open but haproxy stops, the container reconnects. This mode uses `ControlPersist=no`; a different `ControlPersist` value in `SSH_OPTS` is rejected at startup.
+haproxy runs as the remote command of the SSH session and stops when the session ends. When the session stays open but haproxy stops, the container reconnects. This mode always uses `ControlPersist=no`; a `ControlPersist` value in `SSH_OPTS` has no effect.
 
 **Remote host requirements:**
 
 - `haproxy` must be installed (e.g. `dnf install haproxy`). Do not enable its system service. If `haproxy` is not found or cannot run (remote exit code 127), the container stops immediately and does not retry.
 - The remote login shell must be POSIX compatible (sh, bash, zsh).
 - `GatewayPorts` must be `no` or `clientspecified`, **never `yes`**. See [Remote host sshd configuration](#remote-host-sshd-configuration).
-- Ports below 1024 require `SSH_USER=root` (or `CAP_NET_BIND_SERVICE` for haproxy).
+- Ports below 1024 require a privileged bind: `SSH_USER=root`, `CAP_NET_BIND_SERVICE` for haproxy, or a lower `net.ipv4.ip_unprivileged_port_start`.
 - `ClientAliveInterval` should be set. See [Remote host sshd configuration](#remote-host-sshd-configuration).
 
 Use separate tunnels (Helm: list form of `configuration`) to mix PROXY and plain forwards:

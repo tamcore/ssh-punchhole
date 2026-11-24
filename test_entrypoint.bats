@@ -433,7 +433,8 @@ fake_haproxy() {
 @test "PROXY_PROTOCOL does not wait for control socket after ssh exits 0" {
   export PROXY_PROTOCOL="true"
   run ./entrypoint.sh
-  [[ $output =~ "Attempt 1/" ]]
+  [[ $output =~ "-R 127.0.0.1:18080:nginx:80" ]]
+  [[ $output =~ "Max retries (1) reached" ]]
   [[ ! $output =~ "forked to background" ]]
 }
 
@@ -461,10 +462,9 @@ fake_haproxy() {
   [[ $output =~ "invalid bind address" ]]
 }
 
-@test "PROXY_PROTOCOL rejects ControlPersist other than no in SSH_OPTS" {
+@test "PROXY_PROTOCOL ControlPersist=no precedes SSH_OPTS so it wins" {
   export PROXY_PROTOCOL="true"
-  export SSH_OPTS="-o ControlPersist=10m"
+  export SSH_OPTS="-o controlpersist=10m"
   run ./entrypoint.sh
-  [ "$status" -eq 1 ]
-  [[ $output =~ "PROXY_PROTOCOL requires ControlPersist=no" ]]
+  [[ $output =~ "ssh -o StrictHostKeyChecking=yes -o ControlPersist=no -o controlpersist=10m" ]]
 }
