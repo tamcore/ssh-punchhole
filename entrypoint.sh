@@ -22,9 +22,76 @@ if [[ ! -f "${KNOWN_HOSTS_PATH}" ]]; then
   exit 1
 fi
 
-# -N Do not execute a remote command.
-# -n Redirects stdin from /dev/null
-_ssh="ssh -o StrictHostKeyChecking=yes  -N -n ${SSH_OPTS} "
+PROXY_PROTOCOL="${PROXY_PROTOCOL:-false}"
+PROXY_PROTOCOL_VERSION="${PROXY_PROTOCOL_VERSION:-2}"
+PROXY_PROTOCOL_PORT_OFFSET=10000
+MAX_PORT=65535
+STDIN_FIFO="/tmp/ssh-punchhole-stdin"
+HAPROXY_MISSING_EXIT_CODE=127
+
+die() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+case "${PROXY_PROTOCOL}" in
+  true|false) ;;
+  *) die "PROXY_PROTOCOL must be 'true' or 'false', got '${PROXY_PROTOCOL}'" ;;
+esac
+
+case "${PROXY_PROTOCOL_VERSION}" in
+  1) SEND_PROXY="send-proxy" ;;
+  2) SEND_PROXY="send-proxy-v2" ;;
+  *) die "PROXY_PROTOCOL_VERSION must be '1' or '2', got '${PROXY_PROTOCOL_VERSION}'" ;;
+esac
+
+# Separate v4/v6 binds: a v4v6 socket reports IPv4 clients as ::ffff:a.b.c.d in the PROXY header
+haproxy_bind() {
+  case "$1" in
+    ""|"*"|0.0.0.0) printf '  bind 0.0.0.0:%s\n  bind :::%s v6only\n' "$2" "$2" ;;
+    *) printf '  bind %s:%s\n' "$1" "$2" ;;
+  esac
+}
+
+haproxy_frontend() {
+  local bind_addr=$1 port=$2 tunnel_port=$3
+  cat <<EOF
+
+frontend fe_${port}
+$(haproxy_bind "${bind_addr}" "${port}")
+  default_backend be_${port}
+
+backend be_${port}
+  server tunnel 127.0.0.1:${tunnel_port} ${SEND_PROXY}
+EOF
+}
+
+# haproxy runs as the remote command; it is killed when the session's stdin hits EOF (connection gone).
+haproxy_remote_cmd() {
+  cat <<EOF
+command -v haproxy >/dev/null 2>&1 || { echo "ERROR: haproxy not found on remote host" >&2; exit ${HAPROXY_MISSING_EXIT_CODE}; }
+exec 3<&0
+haproxy -db -f /dev/stdin <<'HAPROXY_CFG' &
+defaults
+  mode tcp
+  timeout connect 5s
+  timeout client 1h
+  timeout server 1h
+$1
+HAPROXY_CFG
+pid=\$!
+(cat >/dev/null; kill \$pid 2>/dev/null) <&3 >/dev/null 2>&1 &
+wait \$pid
+EOF
+}
+
+if [[ "${PROXY_PROTOCOL}" == "true" ]]; then
+  _ssh="ssh -o StrictHostKeyChecking=yes ${SSH_OPTS} "
+else
+  # -N Do not execute a remote command.
+  # -n Redirects stdin from /dev/null
+  _ssh="ssh -o StrictHostKeyChecking=yes  -N -n ${SSH_OPTS} "
+fi
 
 # ExitOnForwardFailure prevents SSH from getting stuck in case of a "Warning: remote port forwarding failed for listen port"
 [[ "${SSH_OPTS}" != *ExitOnForwardFailure* ]] && _ssh+="-o ExitOnForwardFailure=yes "
@@ -38,7 +105,10 @@ _ssh="ssh -o StrictHostKeyChecking=yes  -N -n ${SSH_OPTS} "
 # Control socket for health checks
 [[ "${SSH_OPTS}" != *ControlMaster* ]] && _ssh+="-o ControlMaster=auto "
 [[ "${SSH_OPTS}" != *ControlPath* ]] && _ssh+="-o ControlPath=/tmp/ssh-punchhole-%r@%h:%p "
-[[ "${SSH_OPTS}" != *ControlPersist* ]] && _ssh+="-o ControlPersist=10m "
+# PROXY_PROTOCOL: the master must exit with the haproxy session, so its forwards are released
+if [[ "${SSH_OPTS}" != *ControlPersist* ]]; then
+  [[ "${PROXY_PROTOCOL}" == "true" ]] && _ssh+="-o ControlPersist=no " || _ssh+="-o ControlPersist=10m "
+fi
 
 # Performance options (only if explicitly set, not by default)
 if [[ "${SSH_OPTS}" != *Ciphers* ]] && [[ -n "${SSH_CIPHER}" ]]; then
@@ -63,18 +133,51 @@ IFS=' ' read -r -a REMOTE_FORWARD <<< "${REMOTE_FORWARD}"
 IFS=' ' read -r -a LOCAL_DESTINATION <<< "${LOCAL_DESTINATION}"
 
 len=${#REMOTE_FORWARD[@]}
+haproxy_cfg=""
+public_ports=" "
+tunnel_ports=""
 
 for (( i=0; i<$len; i++ ))
 do
   remote=${REMOTE_FORWARD[$i]}
   local=${LOCAL_DESTINATION[$i]-${LOCAL_DESTINATION[0]}}
 
-  echo "$remote -> $local"
+  if [[ "${PROXY_PROTOCOL}" != "true" ]]; then
+    echo "$remote -> $local"
+    _ssh+="-R ${remote}:${local} "
+    continue
+  fi
 
-  _ssh+="-R ${remote}:${local} "
+  port=${remote##*:}
+  bind_addr=""
+  [[ "$remote" == *:* ]] && bind_addr=${remote%:*}
+  max_public_port=$((MAX_PORT - PROXY_PROTOCOL_PORT_OFFSET))
+  if ! [[ "$port" =~ ^[0-9]+$ ]] || (( 10#$port < 1 || 10#$port > max_public_port )); then
+    die "PROXY_PROTOCOL: port '${port}' in '${remote}' must be between 1 and ${max_public_port}"
+  fi
+  port=$((10#$port))
+  tunnel_port=$((port + PROXY_PROTOCOL_PORT_OFFSET))
+
+  echo "$remote -> haproxy (${SEND_PROXY}) -> 127.0.0.1:${tunnel_port} -> $local"
+  _ssh+="-R 127.0.0.1:${tunnel_port}:${local} "
+  haproxy_cfg+=$(haproxy_frontend "${bind_addr}" "${port}" "${tunnel_port}")$'\n'
+  public_ports+="${port} "
+  tunnel_ports+="${tunnel_port} "
+done
+
+for tunnel_port in ${tunnel_ports}; do
+  [[ "${public_ports}" == *" ${tunnel_port} "* ]] && die "PROXY_PROTOCOL: tunnel port ${tunnel_port} collides with a public port in REMOTE_FORWARD"
 done
 
 _ssh+="${SSH_USER-root}@${REMOTE_HOST}"
+
+remote_cmd=""
+if [[ "${PROXY_PROTOCOL}" == "true" ]]; then
+  remote_cmd=$(haproxy_remote_cmd "${haproxy_cfg}")
+  # Read-write open keeps the FIFO from ever delivering EOF, so the remote stdin stays open while ssh lives
+  [[ -p "${STDIN_FIFO}" ]] || mkfifo "${STDIN_FIFO}"
+  exec 3<>"${STDIN_FIFO}"
+fi
 
 # Graceful shutdown handling
 shutdown_requested=false
@@ -123,11 +226,19 @@ while true; do
   echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] Attempt $((retry_count + 1))/$MAX_RETRIES: Connecting to ${SSH_USER-root}@${REMOTE_HOST}:${SSH_PORT-22}"
 
   set +e
-  ${_ssh} &
+  if [[ -n "${remote_cmd}" ]]; then
+    ${_ssh} "${remote_cmd}" <&3 &
+  else
+    ${_ssh} &
+  fi
   ssh_pid=$!
   wait $ssh_pid
   exit_code=$?
   set -e
+
+  if [[ -n "${remote_cmd}" ]] && [[ $exit_code -eq ${HAPROXY_MISSING_EXIT_CODE} ]]; then
+    die "haproxy not found on ${REMOTE_HOST}. Install it there (do not enable the system service)."
+  fi
 
   if [[ $exit_code -eq 0 ]]; then
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] SSH forked to background successfully"

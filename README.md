@@ -6,7 +6,7 @@ Technically it only requires a cheap VPS for the public endpoint and could forwa
 
 This container will be the connecting part between the both endpoints. It'll establish a SSH session to the VPS, open (public) ports there and forward the traffic arriving at those ports to the local destination.
 
-If you fancy, you can have it bind directly to :80 and :443 (which would require it to connect as root, as everything bellow 1024 is restricted), but then you'll lose the ability to log the Source IP. So I'd recommend having a reverse proxy running on your VPS as well and have it configured to forward incoming (public) traffic to your local (tunnel) ports. If you want to bind to a non-loopback IP (i.e. 0.0.0.0 or your servers public IP), you have to enable the `GatewayPorts` in your server's `sshd_config`. Additionally, if the port is bellow 1024, you'll have to connect as root.
+If you fancy, you can have it bind directly to :80 and :443 (which would require it to connect as root, as everything bellow 1024 is restricted), but then you'll lose the ability to log the Source IP. So I'd recommend having a reverse proxy running on your VPS as well and have it configured to forward incoming (public) traffic to your local (tunnel) ports. If you want to bind to a non-loopback IP (i.e. 0.0.0.0 or your servers public IP), you have to set `GatewayPorts clientspecified` in your server's `sshd_config` (see [Remote host sshd configuration](#remote-host-sshd-configuration)). Additionally, if the port is bellow 1024, you'll have to connect as root.
 
 ## Quickstart with haproxy on the VPS, docker-compose for your this tunneling container and Traefik as reverse Proxy
 
@@ -200,6 +200,70 @@ metrics:
 - Exposed on port 9090 at `/ssh_punchhole.prom`
 - Configure alerts via `metrics.prometheusRule` in values.yaml
 
+### PROXY Protocol (v2.6.0+)
+
+Opt-in mode that keeps the client source IP. The container starts a temporary haproxy on the remote host. haproxy binds the public port and sends the PROXY protocol header to the tunnel. You do not need to configure haproxy on the remote host yourself (see the Quickstart above for the manual way).
+
+| Variable | Values | Default | Description |
+|----------|--------|---------|-------------|
+| `PROXY_PROTOCOL` | `true`, `false` | `false` | Enable PROXY protocol mode for all forwards of this tunnel |
+| `PROXY_PROTOCOL_VERSION` | `1`, `2` | `2` | `1` uses haproxy `send-proxy`, `2` uses `send-proxy-v2` |
+
+For each `REMOTE_FORWARD` entry `<addr>:<port>`:
+
+- The tunnel binds `127.0.0.1:<10000+port>` on the remote host.
+- haproxy binds `<addr>:<port>` in TCP mode and forwards to the tunnel with the PROXY header. `0.0.0.0`, `*` or no address binds IPv4 and IPv6 separately (`0.0.0.0:<port>` and `:::<port> v6only`), so IPv4 clients appear as plain IPv4 addresses in the PROXY header. The remote host must have IPv6 enabled; else set an explicit IPv4 address.
+- The public port must be between 1 and 55535. A tunnel port must not be equal to a public port of the same tunnel.
+
+The local destination must accept the PROXY protocol (for example nginx `listen ... proxy_protocol`, Traefik `proxyProtocol.trustedIPs`).
+
+haproxy runs as the remote command of the SSH session and stops when the session ends. When the session stays open but haproxy stops, the container reconnects.
+
+**Remote host requirements:**
+
+- `haproxy` must be installed (e.g. `dnf install haproxy`). Do not enable its system service. If `haproxy` is not found, the container stops immediately and does not retry.
+- The remote login shell must be POSIX compatible (sh, bash, zsh).
+- `GatewayPorts` must be `no` or `clientspecified`, **never `yes`**. See [Remote host sshd configuration](#remote-host-sshd-configuration).
+- Ports below 1024 require `SSH_USER=root`.
+- `ClientAliveInterval` should be set. See [Remote host sshd configuration](#remote-host-sshd-configuration).
+
+Use separate tunnels (Helm: list form of `configuration`) to mix PROXY and plain forwards:
+
+```yaml
+configuration:
+  - REMOTE_HOST: "pub.example.com"
+    REMOTE_FORWARD: "0.0.0.0:80 0.0.0.0:443"
+    LOCAL_DESTINATION: "gateway.svc:80 gateway.svc:443"
+    PROXY_PROTOCOL: "true"
+  - REMOTE_HOST: "pub.example.com"
+    REMOTE_FORWARD: "0.0.0.0:5000"
+    LOCAL_DESTINATION: "app.svc:5000"
+```
+
+### Remote host sshd configuration
+
+Recommended `sshd_config` settings on the remote host, for example in `/etc/ssh/sshd_config.d/50-ssh-punchhole.conf`:
+
+```
+GatewayPorts clientspecified
+ClientAliveInterval 10
+ClientAliveCountMax 3
+```
+
+Reload sshd after the change (e.g. `systemctl reload sshd`).
+
+**`GatewayPorts`** controls which address a remote forward (`-R`) binds:
+
+| Value | Behavior |
+|-------|----------|
+| `no` (default) | Always binds loopback. `REMOTE_FORWARD=0.0.0.0:<port>` is not public. |
+| `clientspecified` | Binds the address in `REMOTE_FORWARD`. Use this value. |
+| `yes` | Always binds all addresses and ignores the address in `REMOTE_FORWARD`. |
+
+> **Security warning:** Do not use `GatewayPorts yes` with `PROXY_PROTOCOL=true`. sshd then binds the tunnel ports (`10000+port`) on all addresses instead of `127.0.0.1`. Clients can connect to the tunnel port directly, bypass haproxy and send a forged PROXY header with a false source IP. Also block the tunnel ports in the firewall of the remote host as a second layer.
+
+**`ClientAliveInterval`** makes sshd detect a dead client. The default `0` disables this check. After a network drop without a TCP close (for example a NAT timeout or a link failure), sshd keeps the old session until TCP keepalive closes it, which can take hours. During this time the old session holds the forwarded ports (and, with `PROXY_PROTOCOL=true`, the haproxy ports). The reconnect then fails with `remote port forwarding failed` or haproxy `cannot bind socket`. With `ClientAliveInterval 10` and `ClientAliveCountMax 3`, sshd closes the old session after approximately 30 seconds.
+
 ## Kubernetes / Helm Usage
 
 Install via Helm:
@@ -258,6 +322,8 @@ See chart/values.yaml for all available options.
 - **Poor performance**: Try `SSH_CIPHER: "aes128-gcm@openssh.com"` or `SSH_IPQOS: "throughput"`
 - **Health checks fail**: Increase `healthcheck.livenessProbe.initialDelaySeconds`
 - **No metrics**: Verify Prometheus Operator installed, check ServiceMonitor labels
+- **`remote port forwarding failed` or haproxy `cannot bind socket` after a reconnect**: An old session still holds the port on the remote host. Set `ClientAliveInterval` (see [Remote host sshd configuration](#remote-host-sshd-configuration)). With `PROXY_PROTOCOL=true`, also make sure the haproxy system service is stopped
+- **PROXY protocol: tunnel ports `10000+port` are public**: `GatewayPorts yes` is set on the remote host. Change it to `clientspecified`
 
 ## Migration from v1.x
 

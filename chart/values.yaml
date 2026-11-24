@@ -146,6 +146,8 @@ resources:
 ## @param configuration.SSH_CIPHER SSH cipher to use (default: chacha20-poly1305@openssh.com)
 ## @param configuration.SSH_COMPRESSION Enable SSH compression (default: no)
 ## @param configuration.SSH_IPQOS IP QoS value for low latency (default: lowdelay)
+## @param configuration.PROXY_PROTOCOL Bind public ports with a temporary haproxy on the remote host that sends the PROXY protocol header (default: false)
+## @param configuration.PROXY_PROTOCOL_VERSION PROXY protocol version, 1 or 2 (default: 2)
 configuration:
   SSH_PORT: "22"
   SSH_USER: "root"
@@ -161,6 +163,8 @@ configuration:
   # SSH_CIPHER: "chacha20-poly1305@openssh.com"  # Optional: Let SSH negotiate by default
   # SSH_COMPRESSION: "no"  # Optional: disabled by default
   # SSH_IPQOS: "lowdelay"  # Optional: low latency by default
+  # PROXY_PROTOCOL: "true"  # Optional: requires haproxy on REMOTE_HOST, see README
+  # PROXY_PROTOCOL_VERSION: "2"
   # -
   #   SSH_PORT: "22"
   #   SSH_USER: "root"
