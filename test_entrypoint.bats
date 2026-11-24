@@ -178,10 +178,10 @@ load test_helper
 
 # Performance Tests
 
-@test "SSH includes Ciphers option with default value" {
+@test "SSH omits Ciphers option by default" {
   run ./entrypoint.sh
   echo $output
-  [[ $output =~ "Ciphers=chacha20-poly1305@openssh.com" ]]
+  [[ ! $output =~ "Ciphers=" ]]
 }
 
 @test "SSH includes Ciphers option with custom value" {
@@ -204,10 +204,10 @@ load test_helper
   [[ $output =~ "Compression=yes" ]]
 }
 
-@test "SSH includes IPQoS option with default value" {
+@test "SSH omits IPQoS option by default" {
   run ./entrypoint.sh
   echo $output
-  [[ $output =~ "IPQoS=lowdelay" ]]
+  [[ ! $output =~ "IPQoS=" ]]
 }
 
 @test "SSH includes IPQoS option with custom value" {
@@ -235,6 +235,7 @@ load test_helper
 
 @test "Uses custom max retries value" {
   export SSH_MAX_RETRIES="5"
+  export SSH_INITIAL_BACKOFF="0"
   run ./entrypoint.sh
   echo $output
   [[ $output =~ "Attempt 1/5" ]]
