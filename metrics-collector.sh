@@ -14,7 +14,7 @@ HAPROXY_FETCH_TIMEOUT=5
 
 mkdir -p "$METRICS_DIR"
 # Staging files of a collector killed mid-write
-rm -f "${METRICS_FILE}".*
+rm -f "${METRICS_FILE}".[0-9]*
 container_start_time=$(date +%s)
 
 # Start httpd in background to expose metrics

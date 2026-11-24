@@ -7,5 +7,6 @@ start_fake_ssh() {
 }
 
 stop_fake_ssh() {
+  pkill -P "${FAKE_SSH_PID}" 2>/dev/null || true
   kill "${FAKE_SSH_PID}" 2>/dev/null || true
 }
