@@ -1,7 +1,7 @@
-# Starts a real process named "ssh" whose argv contains "grep", like the PROXY_PROTOCOL session
+# Starts a real process with argv[0] "ssh" and "grep" in its argv, like the PROXY_PROTOCOL session
 start_fake_ssh() {
   cp "$(command -v bash)" "${BATS_TEST_TMPDIR}/ssh"
-  "${BATS_TEST_TMPDIR}/ssh" -c 'command sleep 60; :' grep &
+  PATH="${BATS_TEST_TMPDIR}:${PATH}" ssh -c 'command sleep 60; :' grep &
   FAKE_SSH_PID=$!
   export FAKE_SSH_PID
 }
