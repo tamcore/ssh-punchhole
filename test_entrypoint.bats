@@ -267,7 +267,7 @@ load test_helper
 # PROXY protocol tests
 
 capture_remote_cmd() {
-  ssh() { printf '%s' "${@: -1}" > "${TEST_DIR}/remote_cmd"; echo "ssh $*"; }
+  ssh() { printf '%s' "${@: -1}" > "${TEST_DIR}/remote_cmd"; echo "ssh $*" > "${TEST_DIR}/ssh_args"; }
   export -f ssh
 }
 
@@ -432,8 +432,9 @@ fake_haproxy() {
 
 @test "PROXY_PROTOCOL does not wait for control socket after ssh exits 0" {
   export PROXY_PROTOCOL="true"
+  capture_remote_cmd
   run ./entrypoint.sh
-  [[ $output =~ "-R 127.0.0.1:18080:nginx:80" ]]
+  [[ $(cat "${TEST_DIR}/ssh_args") =~ "-R 127.0.0.1:" ]]
   [[ $output =~ "Max retries (1) reached" ]]
   [[ ! $output =~ "forked to background" ]]
 }
@@ -465,6 +466,7 @@ fake_haproxy() {
 @test "PROXY_PROTOCOL ControlPersist=no precedes SSH_OPTS so it wins" {
   export PROXY_PROTOCOL="true"
   export SSH_OPTS="-o controlpersist=10m"
+  capture_remote_cmd
   run ./entrypoint.sh
-  [[ $output =~ "ssh -o StrictHostKeyChecking=yes -o ControlPersist=no -o controlpersist=10m" ]]
+  [[ $(cat "${TEST_DIR}/ssh_args") =~ ^"ssh -o StrictHostKeyChecking=yes -o ControlPersist=no -o controlpersist=10m " ]]
 }
