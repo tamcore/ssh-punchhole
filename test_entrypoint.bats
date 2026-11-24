@@ -433,5 +433,38 @@ fake_haproxy() {
 @test "PROXY_PROTOCOL does not wait for control socket after ssh exits 0" {
   export PROXY_PROTOCOL="true"
   run ./entrypoint.sh
+  [[ $output =~ "Attempt 1/" ]]
   [[ ! $output =~ "forked to background" ]]
+}
+
+@test "PROXY_PROTOCOL accepts bracketed IPv6 bind address" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD="[::]:443"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  cmd=$(cat "${TEST_DIR}/remote_cmd")
+  [[ $cmd =~ "bind [::]:443"$'\n' ]]
+}
+
+@test "PROXY_PROTOCOL accepts leading zeros in port" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD="127.0.0.1:000443"
+  run ./entrypoint.sh
+  [[ $output =~ "-R 127.0.0.1:10443:" ]]
+}
+
+@test "PROXY_PROTOCOL rejects bind address with tab" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD=$'1.2.3.4\tx:443'
+  run ./entrypoint.sh
+  [ "$status" -eq 1 ]
+  [[ $output =~ "invalid bind address" ]]
+}
+
+@test "PROXY_PROTOCOL rejects ControlPersist other than no in SSH_OPTS" {
+  export PROXY_PROTOCOL="true"
+  export SSH_OPTS="-o ControlPersist=10m"
+  run ./entrypoint.sh
+  [ "$status" -eq 1 ]
+  [[ $output =~ "PROXY_PROTOCOL requires ControlPersist=no" ]]
 }

@@ -39,6 +39,10 @@ case "${PROXY_PROTOCOL}" in
   *) die "PROXY_PROTOCOL must be 'true' or 'false', got '${PROXY_PROTOCOL}'" ;;
 esac
 
+if [[ "${PROXY_PROTOCOL}" == "true" && "${SSH_OPTS}" == *ControlPersist* && "${SSH_OPTS}" != *ControlPersist=no* ]]; then
+  die "PROXY_PROTOCOL requires ControlPersist=no; remove ControlPersist from SSH_OPTS"
+fi
+
 case "${PROXY_PROTOCOL_VERSION}" in
   1) SEND_PROXY="send-proxy" ;;
   2) SEND_PROXY="send-proxy-v2" ;;
@@ -152,10 +156,10 @@ do
   bind_addr=""
   [[ "$remote" == *:* ]] && bind_addr=${remote%:*}
   max_public_port=$((MAX_PORT - PROXY_PROTOCOL_PORT_OFFSET))
-  if ! [[ "$port" =~ ^[0-9]{1,5}$ ]] || (( 10#$port < 1 || 10#$port > max_public_port )); then
+  if ! [[ "$port" =~ ^0*[0-9]{1,5}$ ]] || (( 10#$port < 1 || 10#$port > max_public_port )); then
     die "PROXY_PROTOCOL: port '${port}' in '${remote}' must be between 1 and ${max_public_port}"
   fi
-  [[ "$bind_addr" =~ ^[0-9A-Za-z.:*_-]*$ ]] || die "PROXY_PROTOCOL: invalid bind address '${bind_addr}' in '${remote}'"
+  [[ "$bind_addr" =~ ^[][0-9A-Za-z.:*_-]*$ ]] || die "PROXY_PROTOCOL: invalid bind address '${bind_addr}' in '${remote}'"
   port=$((10#$port))
   [[ "${public_ports}" == *" ${port} "* ]] && die "PROXY_PROTOCOL: duplicate public port ${port} in REMOTE_FORWARD"
   tunnel_port=$((port + PROXY_PROTOCOL_PORT_OFFSET))

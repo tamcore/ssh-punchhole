@@ -217,7 +217,7 @@ For each `REMOTE_FORWARD` entry `<addr>:<port>`:
 
 The local destination must accept the PROXY protocol (for example nginx `listen ... proxy_protocol`, Traefik `proxyProtocol.trustedIPs`).
 
-haproxy runs as the remote command of the SSH session and stops when the session ends. When the session stays open but haproxy stops, the container reconnects.
+haproxy runs as the remote command of the SSH session and stops when the session ends. When the session stays open but haproxy stops, the container reconnects. This mode uses `ControlPersist=no`; a different `ControlPersist` value in `SSH_OPTS` is rejected at startup.
 
 **Remote host requirements:**
 
