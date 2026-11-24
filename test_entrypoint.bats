@@ -499,7 +499,7 @@ fake_haproxy() {
 @test "PROXY_PROTOCOL disabled has no metrics forward" {
   capture_remote_cmd
   run ./entrypoint.sh
-  ! grep -q -- "-L " "${TEST_DIR}/ssh_args"
+  [ "$(grep -c -- "-L " "${TEST_DIR}/ssh_args")" -eq 0 ]
 }
 
 @test "Remote command removes metrics socket after haproxy exits" {
@@ -536,7 +536,7 @@ run_remote_cmd_with_open_stdin() {
   run_remote_cmd_with_open_stdin
   grep -q -- "-f /dev/stdin -f /dev/fd/4" "${TEST_DIR}/haproxy.args"
   grep -q "bind :::443 v6only" "${TEST_DIR}/haproxy.cfg"
-  ! grep -q "fe_metrics" "${TEST_DIR}/haproxy.cfg"
+  [ "$(grep -c "fe_metrics" "${TEST_DIR}/haproxy.cfg")" -eq 0 ]
   grep -q "frontend fe_metrics" "${TEST_DIR}/metrics.cfg"
   grep -q "  mode http" "${TEST_DIR}/metrics.cfg"
   grep -q "bind unix@/tmp/ssh-punchhole-metrics-pod-a.sock mode 600" "${TEST_DIR}/metrics.cfg"

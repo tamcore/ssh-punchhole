@@ -28,7 +28,7 @@ setup() {
 
 @test "PROXY_PROTOCOL appends haproxy metrics" {
   export PROXY_PROTOCOL=true
-  wget() { [[ "$*" == *"http://127.0.0.1:9101/metrics"* ]] && printf 'haproxy_process_nbthread 4\n'; }
+  wget() { [[ "$*" == *"-Y off"*"http://127.0.0.1:9101/metrics"* ]] && printf 'haproxy_process_nbthread 4\n'; }
   export -f wget
   run bash ./metrics-collector.sh
   [ "$status" -eq 99 ]
@@ -43,7 +43,7 @@ setup() {
   run bash ./metrics-collector.sh
   [ "$status" -eq 99 ]
   grep -q '^ssh_punchhole_haproxy_metrics_up{.*} 0$' "${METRICS_DIR}/ssh_punchhole.prom"
-  ! grep -q 'partial' "${METRICS_DIR}/ssh_punchhole.prom"
+  [ "$(grep -c 'partial' "${METRICS_DIR}/ssh_punchhole.prom")" -eq 0 ]
   grep -q '^ssh_punchhole_up{.*} 1$' "${METRICS_DIR}/ssh_punchhole.prom"
 }
 
@@ -53,7 +53,7 @@ setup() {
   run bash ./metrics-collector.sh
   [ "$status" -eq 99 ]
   [ ! -e "${BATS_TEST_TMPDIR}/wget_called" ]
-  ! grep -q 'haproxy' "${METRICS_DIR}/ssh_punchhole.prom"
+  [ "$(grep -c 'haproxy' "${METRICS_DIR}/ssh_punchhole.prom")" -eq 0 ]
 }
 
 teardown() {

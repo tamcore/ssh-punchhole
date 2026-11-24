@@ -56,6 +56,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | `configuration.LOCAL_DESTINATION` | ip:port combinations to forward traffic to on the local side | `ingress-nginx-controller.ingress-nginx.svc:80 ingress-nginx-controller.ingress-nginx.svc:443` |
 | `configuration.PROXY_PROTOCOL`    | Bind public ports with a temporary haproxy on the remote host that sends the PROXY protocol header (see main README) | `false` |
 | `configuration.PROXY_PROTOCOL_VERSION` | PROXY protocol version, `1` or `2` | `2` |
+| `configuration.HAPROXY_METRICS_PORT` | Local pod port for the remote haproxy metrics forward, `PROXY_PROTOCOL` only | `9101` |
 
 
 ### SSH Credentials

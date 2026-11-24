@@ -95,7 +95,7 @@ EOF
   if [[ "${PROXY_PROTOCOL}" == "true" ]]; then
     haproxy_file="${temp_file}.haproxy"
     haproxy_up=0
-    wget -q -T "${HAPROXY_FETCH_TIMEOUT}" -O - "${HAPROXY_METRICS_URL}" > "${haproxy_file}" 2>/dev/null && haproxy_up=1
+    wget -q -Y off -T "${HAPROXY_FETCH_TIMEOUT}" -O - "${HAPROXY_METRICS_URL}" > "${haproxy_file}" 2>/dev/null && haproxy_up=1
     cat >> "$temp_file" <<EOF
 
 # HELP ssh_punchhole_haproxy_metrics_up Whether the remote haproxy metrics were fetched (1) or not (0)

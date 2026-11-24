@@ -211,6 +211,7 @@ Opt-in mode that keeps the client source IP. The container starts a temporary ha
 |----------|--------|---------|-------------|
 | `PROXY_PROTOCOL` | `true`, `false` | `false` | Enable PROXY protocol mode for all forwards of this tunnel |
 | `PROXY_PROTOCOL_VERSION` | `1`, `2` | `2` | `1` uses haproxy `send-proxy`, `2` uses `send-proxy-v2` |
+| `HAPROXY_METRICS_PORT` | port | `9101` | Local port in the pod for the haproxy metrics forward (v2.7.0+). Must be free in the pod; a port in use stops the tunnel (`ExitOnForwardFailure`) |
 
 For each `REMOTE_FORWARD` entry `<addr>:<port>`:
 

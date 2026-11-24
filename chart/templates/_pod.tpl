@@ -87,6 +87,8 @@ containers:
     value: "9090"
   - name: PROXY_PROTOCOL
     value: "{{ .config.PROXY_PROTOCOL | default "false" }}"
+  - name: HAPROXY_METRICS_PORT
+    value: "{{ .config.HAPROXY_METRICS_PORT | default "9101" }}"
   volumeMounts:
   - name: metrics
     mountPath: /metrics
