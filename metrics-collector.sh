@@ -7,6 +7,7 @@ COLLECTION_INTERVAL="${METRICS_COLLECTION_INTERVAL:-30}"
 REMOTE_HOST="${REMOTE_HOST:-unknown}"
 SSH_PORT="${SSH_PORT:-22}"
 HTTP_PORT="${HTTP_PORT:-9090}"
+HTTPD="${HTTPD:-/usr/sbin/httpd}"
 
 mkdir -p "$METRICS_DIR"
 container_start_time=$(date +%s)
@@ -16,7 +17,7 @@ container_start_time=$(date +%s)
 # -p: port
 # -h: home directory to serve
 cd "$METRICS_DIR"
-/usr/sbin/httpd -f -p "$HTTP_PORT" -h "$METRICS_DIR" &
+"${HTTPD}" -f -p "$HTTP_PORT" -h "$METRICS_DIR" &
 http_server_pid=$!
 
 # Cleanup on exit
@@ -29,7 +30,7 @@ while true; do
   # Check if SSH process is running
   if ps | grep -v grep | grep -w ssh > /dev/null 2>&1; then
     tunnel_up=1
-    ssh_pid=$(ps | grep -v grep | grep -w ssh | awk '{print $1}' | head -1)
+    ssh_pid=$(ps | grep -v grep | grep -w ssh | awk '{print $1}' | sed -n 1p)
     ssh_start_time=$(stat -c %Y /proc/$ssh_pid 2>/dev/null || echo $current_time)
     connection_duration=$((current_time - ssh_start_time))
 
@@ -40,14 +41,14 @@ while true; do
 
     if command -v ss >/dev/null 2>&1; then
       ss_output=$(ss -tin "( dport = :${SSH_PORT} or sport = :${SSH_PORT} )" 2>/dev/null || echo "")
-      if echo "$ss_output" | grep -q "bytes_sent:"; then
-        bytes_sent=$(echo "$ss_output" | sed -n 's/.*bytes_sent:\([0-9]*\).*/\1/p' | head -1)
+      if [[ $ss_output == *bytes_sent:* ]]; then
+        bytes_sent=$(echo "$ss_output" | sed -n 's/.*bytes_sent:\([0-9]*\).*/\1/p' | sed -n 1p)
         bytes_sent=${bytes_sent:-0}
-        bytes_recv=$(echo "$ss_output" | sed -n 's/.*bytes_received:\([0-9]*\).*/\1/p' | head -1)
+        bytes_recv=$(echo "$ss_output" | sed -n 's/.*bytes_received:\([0-9]*\).*/\1/p' | sed -n 1p)
         bytes_recv=${bytes_recv:-0}
       fi
-      if echo "$ss_output" | grep -q "retrans:"; then
-        retrans=$(echo "$ss_output" | sed -n 's/.*retrans:\([0-9]*\)\/.*/\1/p' | head -1)
+      if [[ $ss_output == *retrans:* ]]; then
+        retrans=$(echo "$ss_output" | sed -n 's/.*retrans:\([0-9]*\)\/.*/\1/p' | sed -n 1p)
         retrans=${retrans:-0}
       fi
     fi
