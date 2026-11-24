@@ -1,4 +1,4 @@
-FROM alpine:3.23.3
+FROM alpine:3.24.4
 
 RUN apk add --update --no-cache bash openssh-client iproute2-ss busybox-extras
 
