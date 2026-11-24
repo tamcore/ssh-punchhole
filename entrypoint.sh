@@ -152,10 +152,12 @@ do
   bind_addr=""
   [[ "$remote" == *:* ]] && bind_addr=${remote%:*}
   max_public_port=$((MAX_PORT - PROXY_PROTOCOL_PORT_OFFSET))
-  if ! [[ "$port" =~ ^[0-9]+$ ]] || (( 10#$port < 1 || 10#$port > max_public_port )); then
+  if ! [[ "$port" =~ ^[0-9]{1,5}$ ]] || (( 10#$port < 1 || 10#$port > max_public_port )); then
     die "PROXY_PROTOCOL: port '${port}' in '${remote}' must be between 1 and ${max_public_port}"
   fi
+  [[ "$bind_addr" =~ ^[0-9A-Za-z.:*_-]*$ ]] || die "PROXY_PROTOCOL: invalid bind address '${bind_addr}' in '${remote}'"
   port=$((10#$port))
+  [[ "${public_ports}" == *" ${port} "* ]] && die "PROXY_PROTOCOL: duplicate public port ${port} in REMOTE_FORWARD"
   tunnel_port=$((port + PROXY_PROTOCOL_PORT_OFFSET))
 
   echo "$remote -> haproxy (${SEND_PROXY}) -> 127.0.0.1:${tunnel_port} -> $local"
@@ -237,10 +239,11 @@ while true; do
   set -e
 
   if [[ -n "${remote_cmd}" ]] && [[ $exit_code -eq ${HAPROXY_MISSING_EXIT_CODE} ]]; then
-    die "haproxy not found on ${REMOTE_HOST}. Install it there (do not enable the system service)."
+    die "haproxy not found or not executable on ${REMOTE_HOST}. Install it there (do not enable the system service)."
   fi
 
-  if [[ $exit_code -eq 0 ]]; then
+  # PROXY_PROTOCOL runs ssh in the foreground with ControlPersist=no, so its exit already means the tunnel ended
+  if [[ $exit_code -eq 0 ]] && [[ -z "${remote_cmd}" ]]; then
     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] SSH forked to background successfully"
     # SSH with ControlMaster forks to background on successful connection
     # Wait for control socket to disappear (indicates tunnel died)

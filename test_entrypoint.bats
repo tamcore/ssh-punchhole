@@ -365,7 +365,7 @@ fake_haproxy() {
   export PROXY_PROTOCOL="true"
   capture_remote_cmd
   run ./entrypoint.sh
-  run env PATH=/usr/bin:/bin sh "${TEST_DIR}/remote_cmd" < /dev/null
+  run env PATH=/nonexistent /bin/sh "${TEST_DIR}/remote_cmd" < /dev/null
   [ "$status" -eq 127 ]
   [[ $output =~ "haproxy not found on remote host" ]]
 }
@@ -402,6 +402,36 @@ fake_haproxy() {
   export -f ssh
   run ./entrypoint.sh
   [ "$status" -eq 1 ]
-  [[ $output =~ "haproxy not found on test.example.com" ]]
+  [[ $output =~ "haproxy not found or not executable on test.example.com" ]]
   [[ ! $output =~ "Attempt 2/" ]]
+}
+
+@test "PROXY_PROTOCOL rejects bind address with unsupported characters" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD="1.2.3.4:81,0.0.0.0:443"
+  run ./entrypoint.sh
+  [ "$status" -eq 1 ]
+  [[ $output =~ "invalid bind address" ]]
+}
+
+@test "PROXY_PROTOCOL rejects duplicate public port" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD="10.0.0.1:443 10.0.0.2:443"
+  run ./entrypoint.sh
+  [ "$status" -eq 1 ]
+  [[ $output =~ "duplicate public port 443" ]]
+}
+
+@test "PROXY_PROTOCOL rejects port that overflows arithmetic" {
+  export PROXY_PROTOCOL="true"
+  export REMOTE_FORWARD="0.0.0.0:18446744073709551696"
+  run ./entrypoint.sh
+  [ "$status" -eq 1 ]
+  [[ $output =~ "must be between 1 and 55535" ]]
+}
+
+@test "PROXY_PROTOCOL does not wait for control socket after ssh exits 0" {
+  export PROXY_PROTOCOL="true"
+  run ./entrypoint.sh
+  [[ ! $output =~ "forked to background" ]]
 }

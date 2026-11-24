@@ -221,10 +221,10 @@ haproxy runs as the remote command of the SSH session and stops when the session
 
 **Remote host requirements:**
 
-- `haproxy` must be installed (e.g. `dnf install haproxy`). Do not enable its system service. If `haproxy` is not found, the container stops immediately and does not retry.
+- `haproxy` must be installed (e.g. `dnf install haproxy`). Do not enable its system service. If `haproxy` is not found or cannot run (remote exit code 127), the container stops immediately and does not retry.
 - The remote login shell must be POSIX compatible (sh, bash, zsh).
 - `GatewayPorts` must be `no` or `clientspecified`, **never `yes`**. See [Remote host sshd configuration](#remote-host-sshd-configuration).
-- Ports below 1024 require `SSH_USER=root`.
+- Ports below 1024 require `SSH_USER=root` (or `CAP_NET_BIND_SERVICE` for haproxy).
 - `ClientAliveInterval` should be set. See [Remote host sshd configuration](#remote-host-sshd-configuration).
 
 Use separate tunnels (Helm: list form of `configuration`) to mix PROXY and plain forwards:
