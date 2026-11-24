@@ -28,6 +28,10 @@ PROXY_PROTOCOL_PORT_OFFSET=10000
 MAX_PORT=65535
 STDIN_FIFO="/tmp/ssh-punchhole-stdin"
 HAPROXY_MISSING_EXIT_CODE=127
+HAPROXY_METRICS_PORT="${HAPROXY_METRICS_PORT:-9101}"
+# Per-pod name: several deployments may share one remote host
+_host="${HOSTNAME:-$(hostname)}"
+HAPROXY_METRICS_SOCKET="/tmp/ssh-punchhole-metrics-${_host//[^A-Za-z0-9.-]/_}.sock"
 
 die() {
   echo "ERROR: $*" >&2
@@ -71,7 +75,10 @@ haproxy_remote_cmd() {
   cat <<EOF
 command -v haproxy >/dev/null 2>&1 || { echo "ERROR: haproxy not found on remote host" >&2; exit ${HAPROXY_MISSING_EXIT_CODE}; }
 exec 3<&0
-haproxy -db -f /dev/stdin <<'HAPROXY_CFG' &
+# Metrics frontend only when haproxy has the exporter; else the whole config is invalid
+metrics_cfg=/dev/null
+haproxy -vv 2>/dev/null | grep -q prometheus-exporter && metrics_cfg=/dev/fd/4
+haproxy -db -f /dev/stdin -f \$metrics_cfg <<'HAPROXY_CFG' 4<<'METRICS_CFG' &
 defaults
   mode tcp
   timeout connect 5s
@@ -79,9 +86,17 @@ defaults
   timeout server 1h
 $1
 HAPROXY_CFG
+frontend fe_metrics
+  mode http
+  bind unix@${HAPROXY_METRICS_SOCKET} mode 600
+  http-request use-service prometheus-exporter
+METRICS_CFG
 pid=\$!
 (cat >/dev/null; kill \$pid 2>/dev/null) <&3 >/dev/null 2>&1 &
 wait \$pid
+rc=\$?
+rm -f ${HAPROXY_METRICS_SOCKET}
+exit \$rc
 EOF
 }
 
@@ -169,6 +184,7 @@ for tunnel_port in ${tunnel_ports}; do
   [[ "${public_ports}" == *" ${tunnel_port} "* ]] && die "PROXY_PROTOCOL: tunnel port ${tunnel_port} collides with a public port in REMOTE_FORWARD"
 done
 
+[[ "${PROXY_PROTOCOL}" == "true" ]] && _ssh+="-L 127.0.0.1:${HAPROXY_METRICS_PORT}:${HAPROXY_METRICS_SOCKET} "
 _ssh+="${SSH_USER-root}@${REMOTE_HOST}"
 
 remote_cmd=""

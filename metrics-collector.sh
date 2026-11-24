@@ -8,6 +8,9 @@ REMOTE_HOST="${REMOTE_HOST:-unknown}"
 SSH_PORT="${SSH_PORT:-22}"
 HTTP_PORT="${HTTP_PORT:-9090}"
 HTTPD="${HTTPD:-/usr/sbin/httpd}"
+PROXY_PROTOCOL="${PROXY_PROTOCOL:-false}"
+HAPROXY_METRICS_URL="http://127.0.0.1:${HAPROXY_METRICS_PORT:-9101}/metrics"
+HAPROXY_FETCH_TIMEOUT=5
 
 mkdir -p "$METRICS_DIR"
 container_start_time=$(date +%s)
@@ -88,6 +91,20 @@ ssh_punchhole_retransmits_total{remote_host="${REMOTE_HOST}"} ${retrans}
 # TYPE ssh_punchhole_container_uptime_seconds gauge
 ssh_punchhole_container_uptime_seconds{remote_host="${REMOTE_HOST}"} ${container_uptime}
 EOF
+
+  if [[ "${PROXY_PROTOCOL}" == "true" ]]; then
+    haproxy_file="${temp_file}.haproxy"
+    haproxy_up=0
+    wget -q -T "${HAPROXY_FETCH_TIMEOUT}" -O - "${HAPROXY_METRICS_URL}" > "${haproxy_file}" 2>/dev/null && haproxy_up=1
+    cat >> "$temp_file" <<EOF
+
+# HELP ssh_punchhole_haproxy_metrics_up Whether the remote haproxy metrics were fetched (1) or not (0)
+# TYPE ssh_punchhole_haproxy_metrics_up gauge
+ssh_punchhole_haproxy_metrics_up{remote_host="${REMOTE_HOST}"} ${haproxy_up}
+EOF
+    (( haproxy_up )) && cat "${haproxy_file}" >> "$temp_file"
+    rm -f "${haproxy_file}"
+  fi
 
   mv "$temp_file" "$METRICS_FILE"
   sleep "$COLLECTION_INTERVAL"

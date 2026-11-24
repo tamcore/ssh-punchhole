@@ -85,6 +85,8 @@ containers:
     value: "{{ .config.SSH_PORT }}"
   - name: HTTP_PORT
     value: "9090"
+  - name: PROXY_PROTOCOL
+    value: "{{ .config.PROXY_PROTOCOL | default "false" }}"
   volumeMounts:
   - name: metrics
     mountPath: /metrics

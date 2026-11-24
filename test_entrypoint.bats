@@ -273,7 +273,7 @@ capture_remote_cmd() {
 
 fake_haproxy() {
   mkdir -p "${TEST_DIR}/bin"
-  printf '#!/bin/sh\ncat > "%s/haproxy.cfg"\n%s\n' "${TEST_DIR}" "$1" > "${TEST_DIR}/bin/haproxy"
+  printf '#!/bin/sh\n[ "$1" = -vv ] && { echo "${FAKE_HAPROXY_VV}"; exit 0; }\necho "$@" > "%s/haproxy.args"\ncat > "%s/haproxy.cfg"\ncat "$5" > "%s/metrics.cfg"\n%s\n' "${TEST_DIR}" "${TEST_DIR}" "${TEST_DIR}" "$1" > "${TEST_DIR}/bin/haproxy"
   chmod +x "${TEST_DIR}/bin/haproxy"
 }
 
@@ -477,4 +477,80 @@ fake_haproxy() {
   export -f ssh
   run ./entrypoint.sh < /dev/null
   [ "$(cat "${TEST_DIR}/stdin_type")" = "fifo" ]
+}
+
+@test "PROXY_PROTOCOL forwards haproxy metrics socket to local port" {
+  export PROXY_PROTOCOL="true"
+  export HOSTNAME="pod-a"
+  export REMOTE_FORWARD="0.0.0.0:443"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  grep -q -- "-L 127.0.0.1:9101:/tmp/ssh-punchhole-metrics-pod-a.sock " "${TEST_DIR}/ssh_args"
+}
+
+@test "PROXY_PROTOCOL metrics socket name only uses safe characters" {
+  export PROXY_PROTOCOL="true"
+  export HOSTNAME='pod/a b;$x'
+  capture_remote_cmd
+  run ./entrypoint.sh
+  grep -q -- "-L 127.0.0.1:9101:/tmp/ssh-punchhole-metrics-pod_a_b__x.sock " "${TEST_DIR}/ssh_args"
+}
+
+@test "PROXY_PROTOCOL disabled has no metrics forward" {
+  capture_remote_cmd
+  run ./entrypoint.sh
+  ! grep -q -- "-L " "${TEST_DIR}/ssh_args"
+}
+
+@test "Remote command removes metrics socket after haproxy exits" {
+  export PROXY_PROTOCOL="true"
+  export HOSTNAME="bats-$$-${RANDOM}"
+  sock="/tmp/ssh-punchhole-metrics-${HOSTNAME}.sock"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  fake_haproxy "exit 3"
+  touch "$sock"
+  mkfifo "${TEST_DIR}/stdin"
+  exec 4<>"${TEST_DIR}/stdin"
+  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" <&4
+  exec 4>&-
+  [ "$status" -eq 3 ]
+  [ ! -e "$sock" ]
+}
+
+run_remote_cmd_with_open_stdin() {
+  mkfifo "${TEST_DIR}/stdin"
+  exec 4<>"${TEST_DIR}/stdin"
+  run env PATH="${TEST_DIR}/bin:${PATH}" sh "${TEST_DIR}/remote_cmd" <&4
+  exec 4>&-
+}
+
+@test "Remote haproxy loads metrics frontend when it has the Prometheus exporter" {
+  export PROXY_PROTOCOL="true"
+  export HOSTNAME="pod-a"
+  export REMOTE_FORWARD="0.0.0.0:443"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  fake_haproxy "exit 0"
+  export FAKE_HAPROXY_VV="Available services : prometheus-exporter"
+  run_remote_cmd_with_open_stdin
+  grep -q -- "-f /dev/stdin -f /dev/fd/4" "${TEST_DIR}/haproxy.args"
+  grep -q "bind :::443 v6only" "${TEST_DIR}/haproxy.cfg"
+  ! grep -q "fe_metrics" "${TEST_DIR}/haproxy.cfg"
+  grep -q "frontend fe_metrics" "${TEST_DIR}/metrics.cfg"
+  grep -q "  mode http" "${TEST_DIR}/metrics.cfg"
+  grep -q "bind unix@/tmp/ssh-punchhole-metrics-pod-a.sock mode 600" "${TEST_DIR}/metrics.cfg"
+  grep -q "http-request use-service prometheus-exporter" "${TEST_DIR}/metrics.cfg"
+}
+
+@test "Remote haproxy skips metrics frontend without the Prometheus exporter" {
+  export PROXY_PROTOCOL="true"
+  capture_remote_cmd
+  run ./entrypoint.sh
+  fake_haproxy "exit 0"
+  export FAKE_HAPROXY_VV="Available services : none"
+  run_remote_cmd_with_open_stdin
+  [ "$status" -eq 0 ]
+  grep -q -- "-f /dev/stdin -f /dev/null" "${TEST_DIR}/haproxy.args"
+  [ ! -s "${TEST_DIR}/metrics.cfg" ]
 }
