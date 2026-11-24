@@ -148,6 +148,7 @@ resources:
 ## @param configuration.SSH_IPQOS IP QoS value for low latency (default: lowdelay)
 ## @param configuration.PROXY_PROTOCOL Bind public ports with a temporary haproxy on the remote host that sends the PROXY protocol header (default: false)
 ## @param configuration.PROXY_PROTOCOL_VERSION PROXY protocol version, 1 or 2 (default: 2)
+## @param configuration.HAPROXY_METRICS_PORT Local pod port for the remote haproxy metrics forward, PROXY_PROTOCOL only (default: 9101)
 configuration:
   SSH_PORT: "22"
   SSH_USER: "root"
@@ -165,6 +166,7 @@ configuration:
   # SSH_IPQOS: "lowdelay"  # Optional: low latency by default
   # PROXY_PROTOCOL: "true"  # Optional: requires haproxy on REMOTE_HOST, see README
   # PROXY_PROTOCOL_VERSION: "2"
+  # HAPROXY_METRICS_PORT: "9101"
   # -
   #   SSH_PORT: "22"
   #   SSH_USER: "root"

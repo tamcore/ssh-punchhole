@@ -182,6 +182,8 @@ Optional Prometheus-compatible metrics for monitoring tunnel health. The metrics
 - `ssh_punchhole_bytes_received_total` - Total bytes received
 - `ssh_punchhole_retransmits_total` - TCP retransmissions (connection quality)
 - `ssh_punchhole_container_uptime_seconds` - Container uptime
+- `ssh_punchhole_haproxy_metrics_up` - Remote haproxy metrics fetched (1) or not (0). Only with `PROXY_PROTOCOL=true`
+- `haproxy_*` - Metrics of the remote haproxy (built-in Prometheus exporter), for example `haproxy_frontend_current_sessions{proxy="fe_443"}`. Only with `PROXY_PROTOCOL=true` (v2.7.0+)
 
 **Enable Metrics (Opt-in):**
 ```yaml
@@ -199,6 +201,7 @@ metrics:
 - Metrics collector runs as sidecar with `command: ["/metrics-collector.sh"]`
 - Exposed on port 9090 at `/ssh_punchhole.prom`
 - Configure alerts via `metrics.prometheusRule` in values.yaml
+- With `PROXY_PROTOCOL=true`, the remote haproxy serves its metrics on a unix socket (`/tmp/sph-metrics-<pod name>.sock`, mode 600). The SSH session forwards it to `127.0.0.1:<HAPROXY_METRICS_PORT>` (default `9101`) in the pod. The collector fetches it on each interval and appends it to the same file, so the haproxy metrics are up to `collectionInterval` old
 
 ### PROXY Protocol (v2.6.0+)
 
@@ -208,6 +211,7 @@ Opt-in mode that keeps the client source IP. The container starts a temporary ha
 |----------|--------|---------|-------------|
 | `PROXY_PROTOCOL` | `true`, `false` | `false` | Enable PROXY protocol mode for all forwards of this tunnel |
 | `PROXY_PROTOCOL_VERSION` | `1`, `2` | `2` | `1` uses haproxy `send-proxy`, `2` uses `send-proxy-v2` |
+| `HAPROXY_METRICS_PORT` | port | `9101` | Local port in the pod for the haproxy metrics forward (v2.7.0+). Must be free in the pod; with the default `ExitOnForwardFailure=yes`, a port in use stops the tunnel |
 
 For each `REMOTE_FORWARD` entry `<addr>:<port>`:
 
@@ -226,6 +230,7 @@ haproxy runs as the remote command of the SSH session and stops when the session
 - `GatewayPorts` must be `no` or `clientspecified`, **never `yes`**. See [Remote host sshd configuration](#remote-host-sshd-configuration).
 - Ports below 1024 require a privileged bind: `SSH_USER=root`, `CAP_NET_BIND_SERVICE` for haproxy, or `net.ipv4.ip_unprivileged_port_start` set to the lowest public port or less.
 - `ClientAliveInterval` should be set. See [Remote host sshd configuration](#remote-host-sshd-configuration).
+- For haproxy metrics (v2.7.0+): haproxy must be built with the Prometheus exporter (`haproxy -vv` shows `+PROMEX`), and sshd must allow `AllowStreamLocalForwarding` (default `yes`). Without them, only `ssh_punchhole_haproxy_metrics_up` is `0`; the tunnel works.
 
 Use separate tunnels (Helm: list form of `configuration`) to mix PROXY and plain forwards:
 
@@ -323,6 +328,7 @@ See chart/values.yaml for all available options.
 - **Health checks fail**: Increase `healthcheck.livenessProbe.initialDelaySeconds`
 - **No metrics**: Verify Prometheus Operator installed, check ServiceMonitor labels
 - **`remote port forwarding failed` or haproxy `cannot bind socket` after a reconnect**: An old session still holds the port on the remote host. Set `ClientAliveInterval` (see [Remote host sshd configuration](#remote-host-sshd-configuration)). With `PROXY_PROTOCOL=true`, also make sure the haproxy system service is stopped
+- **`ssh_punchhole_haproxy_metrics_up` is `0`**: Check `haproxy -vv | grep PROMEX` on the remote host and `AllowStreamLocalForwarding` in its sshd configuration. In the ssh-punchhole log, `open failed` means the socket forward was rejected or the socket is missing
 - **PROXY protocol: tunnel ports `10000+port` are public**: `GatewayPorts yes` is set on the remote host. Change it to `clientspecified`
 
 ## Migration from v1.x
@@ -335,11 +341,10 @@ v2.5.0 is backwards compatible. New features are opt-in (except health checks, e
 
 ```bash
 # Run BATS tests
-bats test_entrypoint.bats
+bats .
 
-# Build Docker images
+# Build Docker image
 docker build -t ssh-punchhole:test .
-docker build -t ssh-punchhole-metrics:test -f Dockerfile.metrics .
 ```
 
 ### Building Locally
