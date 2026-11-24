@@ -54,6 +54,8 @@ The command removes all the Kubernetes components associated with the chart and 
 | `configuration.REMOTE_HOST`       | Remote host to connect to                                    | `pub.example.com`                                                                              |
 | `configuration.REMOTE_FORWARD`    | ip:port combinations to open on the remote host              | `0.0.0.0:80 0.0.0.0:443`                                                                       |
 | `configuration.LOCAL_DESTINATION` | ip:port combinations to forward traffic to on the local side | `ingress-nginx-controller.ingress-nginx.svc:80 ingress-nginx-controller.ingress-nginx.svc:443` |
+| `configuration.PROXY_PROTOCOL`    | Bind public ports with a temporary haproxy on the remote host that sends the PROXY protocol header (see main README) | `false` |
+| `configuration.PROXY_PROTOCOL_VERSION` | PROXY protocol version, `1` or `2` | `2` |
 
 
 ### SSH Credentials
